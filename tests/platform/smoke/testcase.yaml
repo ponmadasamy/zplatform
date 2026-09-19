@@ -1,0 +1,9 @@
+tests:
+  zplatform.platform.smoke:
+    tags: zplatform
+    platform_allow:
+      - stm3210e_eval
+      - native_sim
+    integration_platforms:
+      - stm3210e_eval
+    harness: ztest

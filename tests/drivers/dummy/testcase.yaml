@@ -1,0 +1,7 @@
+tests:
+  zplatform.drivers.dummy:
+    tags: zplatform drivers
+    platform_allow:
+      - native_sim
+      - stm3210e_eval
+    harness: ztest
