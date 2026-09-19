@@ -1,0 +1,12 @@
+/*
+ * Copyright (c) 2026 ZPlatform contributors
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Select primary image slot when building an application for MCUboot.
+ */
+
+/ {
+	chosen {
+		zephyr,code-partition = &slot0_partition;
+	};
+};

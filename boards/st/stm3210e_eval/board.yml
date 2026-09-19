@@ -1,0 +1,9 @@
+# Copyright (c) 2026 ZPlatform contributors
+# SPDX-License-Identifier: Apache-2.0
+
+board:
+  name: stm3210e_eval
+  full_name: STM3210E Evaluation
+  vendor: st
+  socs:
+    - name: stm32f103xe

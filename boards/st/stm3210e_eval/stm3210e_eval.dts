@@ -1,0 +1,222 @@
+/*
+ * Copyright (c) 2026 ZPlatform contributors
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * STM3210E-EVAL — STMicroelectronics evaluation board with STM32F103ZGT6.
+ *
+ * Pin assignments derived from ST BSP (stm3210e_eval.h) and UM0455 / MB672.
+ * Target MCU: STM32F103ZGT6 (1 MiB Flash, 96 KiB SRAM, Cortex-M3 @ 72 MHz).
+ * Older MB672 revisions may ship STM32F103ZET6 (512 KiB / 64 KiB) — use a
+ * board variant/overlay if required.
+ */
+
+/dts-v1/;
+#include <st/f1/stm32f103Xg.dtsi>
+#include <st/f1/stm32f103z(f-g)tx-pinctrl.dtsi>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+/ {
+	model = "STMicroelectronics STM3210E-EVAL board";
+	compatible = "st,stm3210e-eval";
+
+	chosen {
+		zephyr,console = &usart1;
+		zephyr,shell-uart = &usart1;
+		zephyr,sram = &sram0;
+		zephyr,flash = &flash0;
+		/* zephyr,code-partition is set by MCUboot overlays only */
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		green_led_1: led_1 {
+			gpios = <&gpiof 6 GPIO_ACTIVE_HIGH>;
+			label = "User LD1";
+		};
+
+		orange_led_2: led_2 {
+			gpios = <&gpiof 7 GPIO_ACTIVE_HIGH>;
+			label = "User LD2";
+		};
+
+		red_led_3: led_3 {
+			gpios = <&gpiof 8 GPIO_ACTIVE_HIGH>;
+			label = "User LD3";
+		};
+
+		blue_led_4: led_4 {
+			gpios = <&gpiof 9 GPIO_ACTIVE_HIGH>;
+			label = "User LD4";
+		};
+	};
+
+	gpio_keys {
+		compatible = "gpio-keys";
+
+		user_button: button_key {
+			label = "User Key";
+			gpios = <&gpiog 8 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+			zephyr,code = <INPUT_KEY_0>;
+		};
+
+		tamper_button: button_tamper {
+			label = "Tamper";
+			gpios = <&gpioc 13 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+			zephyr,code = <INPUT_KEY_1>;
+		};
+
+		wakeup_button: button_wakeup {
+			label = "Wakeup";
+			gpios = <&gpioa 0 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+			zephyr,code = <INPUT_KEY_WAKEUP>;
+		};
+	};
+
+	aliases {
+		led0 = &green_led_1;
+		led1 = &orange_led_2;
+		led2 = &red_led_3;
+		led3 = &blue_led_4;
+		sw0 = &user_button;
+		sw1 = &tamper_button;
+		watchdog0 = &iwdg;
+		die-temp0 = &die_temp;
+		mcuboot-button0 = &user_button;
+	};
+};
+
+&clk_lsi {
+	status = "okay";
+};
+
+&clk_hse {
+	clock-frequency = <DT_FREQ_M(8)>;
+	status = "okay";
+};
+
+&pll {
+	mul = <9>;
+	clocks = <&clk_hse>;
+	status = "okay";
+};
+
+&rcc {
+	clocks = <&pll>;
+	clock-frequency = <DT_FREQ_M(72)>;
+	ahb-prescaler = <1>;
+	apb1-prescaler = <2>;
+	apb2-prescaler = <1>;
+};
+
+&usart1 {
+	pinctrl-0 = <&usart1_tx_pa9 &usart1_rx_pa10>;
+	pinctrl-names = "default";
+	current-speed = <115200>;
+	status = "okay";
+};
+
+&usart2 {
+	pinctrl-0 = <&usart2_tx_pa2 &usart2_rx_pa3>;
+	pinctrl-names = "default";
+	current-speed = <115200>;
+	status = "disabled";
+};
+
+&i2c1 {
+	pinctrl-0 = <&i2c1_scl_pb6 &i2c1_sda_pb7>;
+	pinctrl-names = "default";
+	status = "okay";
+	clock-frequency = <I2C_BITRATE_STANDARD>;
+
+	/* STLM75 temperature sensor on the evaluation board */
+	stlm75: stlm75@48 {
+		compatible = "lm75";
+		reg = <0x48>;
+		status = "okay";
+	};
+};
+
+&spi1 {
+	pinctrl-0 = <&spi1_sck_master_pa5 &spi1_miso_master_pa6
+		     &spi1_mosi_master_pa7>;
+	pinctrl-names = "default";
+	cs-gpios = <&gpiob 2 GPIO_ACTIVE_LOW>;
+	status = "okay";
+};
+
+&iwdg {
+	status = "okay";
+};
+
+&timers1 {
+	st,prescaler = <7199>;
+	status = "okay";
+
+	pwm1: pwm {
+		status = "okay";
+		pinctrl-0 = <&tim1_ch1_pwm_out_pa8>;
+		pinctrl-names = "default";
+	};
+};
+
+zephyr_udc0: &usb {
+	pinctrl-0 = <&usb_dm_pa11 &usb_dp_pa12>;
+	pinctrl-names = "default";
+	status = "okay";
+};
+
+&rtc {
+	clocks = <&rcc STM32_CLOCK(APB1, 28)>,
+		 <&rcc STM32_SRC_LSI RTC_SEL(2)>;
+	status = "okay";
+};
+
+&adc1 {
+	pinctrl-0 = <&adc1_in1_pa1>;
+	pinctrl-names = "default";
+	status = "okay";
+};
+
+&die_temp {
+	status = "okay";
+};
+
+&flash0 {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		/*
+		 * Internal Flash layout for STM32F103ZGT6 (1024 KiB, 2 KiB erase).
+		 * Dual-slot MCUboot without scratch (swap-move / direct-xip capable).
+		 *
+		 * | Region   | Offset   | Size   | Purpose              |
+		 * |-----------|----------|--------|----------------------|
+		 * | MCUboot   | 0x00000  | 64 KiB | Bootloader           |
+		 * | Slot 0    | 0x10000  | 464 KiB| Primary application  |
+		 * | Slot 1    | 0x84000  | 464 KiB| Secondary / update   |
+		 * | Storage   | 0xF8000  | 32 KiB | Settings / NVS       |
+		 */
+		boot_partition: partition@0 {
+			label = "mcuboot";
+			reg = <0x00000000 DT_SIZE_K(64)>;
+		};
+
+		slot0_partition: partition@10000 {
+			label = "image-0";
+			reg = <0x00010000 DT_SIZE_K(464)>;
+		};
+
+		slot1_partition: partition@84000 {
+			label = "image-1";
+			reg = <0x00084000 DT_SIZE_K(464)>;
+		};
+
+		storage_partition: partition@f8000 {
+			label = "storage";
+			reg = <0x000f8000 DT_SIZE_K(32)>;
+		};
+	};
+};

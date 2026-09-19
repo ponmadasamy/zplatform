@@ -1,0 +1,21 @@
+identifier: stm3210e_eval
+name: STM3210E-EVAL
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+  - gnuarmemb
+ram: 96
+flash: 1024
+supported:
+  - gpio
+  - i2c
+  - spi
+  - pwm
+  - watchdog
+  - adc
+  - counter
+  - usbd
+  - nvs
+  - rtc
+vendor: st
