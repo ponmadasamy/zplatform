@@ -1,0 +1,15 @@
+sample:
+  name: ZPlatform board bring-up
+common:
+  tags: zplatform bringup
+  harness: console
+  harness_config:
+    type: one_line
+    regex:
+      - "ZPlatform board bring-up"
+tests:
+  sample.zplatform.board_bringup:
+    platform_allow:
+      - stm3210e_eval
+    integration_platforms:
+      - stm3210e_eval

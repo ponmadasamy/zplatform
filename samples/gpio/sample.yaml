@@ -1,0 +1,12 @@
+sample:
+  name: ZPlatform GPIO sample
+tests:
+  sample.zplatform.gpio:
+    tags: gpio
+    platform_allow:
+      - stm3210e_eval
+    harness: console
+    harness_config:
+      type: one_line
+      regex:
+        - "GPIO sample"

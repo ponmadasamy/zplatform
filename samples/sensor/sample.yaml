@@ -1,0 +1,12 @@
+sample:
+  name: ZPlatform sensor sample
+tests:
+  sample.zplatform.sensor:
+    tags: sensor
+    platform_allow:
+      - stm3210e_eval
+    harness: console
+    harness_config:
+      type: one_line
+      regex:
+        - "Sensor sample"
