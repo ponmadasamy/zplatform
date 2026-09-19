@@ -12,9 +12,11 @@ config ZPLATFORM
 config ZPLATFORM_LIB_COMMON
 	bool "ZPlatform common library"
 	depends on ZPLATFORM
+	imply HWINFO
 	default y
 	help
-	  Common helpers: version, board identity, system info.
+	  Common helpers: version, board identity, system info,
+	  device UID, build stamp, and reset cause.
 
 config ZPLATFORM_LIB_DIAGNOSTICS
 	bool "ZPlatform diagnostics library"

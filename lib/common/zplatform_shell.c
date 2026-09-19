@@ -12,6 +12,8 @@
 static int cmd_zplatform_info(const struct shell *sh, size_t argc, char **argv)
 {
 	struct zplatform_sys_info info;
+	char uid[(ZPLATFORM_UID_MAX_LEN * 2) + 1];
+	char reset[96];
 
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
@@ -21,9 +23,15 @@ static int cmd_zplatform_info(const struct shell *sh, size_t argc, char **argv)
 		return -EIO;
 	}
 
+	(void)zplatform_format_uid(&info, uid, sizeof(uid));
+	(void)zplatform_format_reset_cause(info.reset_cause, reset, sizeof(reset));
+
 	shell_print(sh, "ZPlatform: %s", info.zplatform_version);
 	shell_print(sh, "Zephyr:    %s", info.zephyr_version);
 	shell_print(sh, "Board:     %s", info.board);
+	shell_print(sh, "Build:     %s %s", info.build_date, info.build_time);
+	shell_print(sh, "UID:       %s", uid);
+	shell_print(sh, "Reset:     %s", reset);
 	shell_print(sh, "CPU:       %u Hz", info.cpu_freq_hz);
 	shell_print(sh, "Flash:     %u", info.flash_size);
 	shell_print(sh, "SRAM:      %u", info.sram_size);

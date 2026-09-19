@@ -256,6 +256,22 @@ Absolute Flash base: `0x08000000`.
 
 Swap mode: `CONFIG_BOOT_SWAP_USING_MOVE=y` (no scratch partition).
 
+Signature: **ECDSA-P256** + TinyCrypt (RSA/mbedTLS does not fit the
+64 KiB boot slot). Development key: `keys/root-ec-p256.pem` (not
+committed; see `keys/README.md`).
+
+Flash addresses (CubeProgrammer):
+
+| Image | Address |
+|-------|---------|
+| MCUboot | `0x08000000` |
+| Signed slot 0 | `0x08010000` |
+
+```powershell
+.\scripts\ps1\build.ps1 demo -Board stm3210e_eval -Mcuboot
+# then imgtool-sign zephyr.bin → zephyr.signed.bin (slot-size 0x74000)
+```
+
 See `support/mcuboot.conf`, `stm3210e_eval_mcuboot.overlay`, and
 `./scripts/sh/mcuboot_demo.sh`.
 
@@ -288,15 +304,18 @@ hardware pass). Use Twister device testing when hardware is attached.
 ## Hardware validation
 
 ```text
-Hardware validation: PASS console (2026-09-19)
+Hardware validation: PASS (2026-09-19)
 Probe             : STLINK-V3MINI + adapter on CN9
 Power             : CN14 USB
 Die / ID          : STM32F103ZGT6 / DEV_ID 0x430 / 1 MiB
-SWD flash         : PASS (CubeProgrammer)
-JTAG connect/flash: PASS (earlier this session)
-COM3 VCP          : PASS after TX/RX swap on CN10
-                  : captured board_bringup banner @ 115200
-                  : [PASS] LED, BUTTON, Console
+SWD flash         : PASS (CubeProgrammer preferred)
+JTAG connect/flash: PASS
+COM3 VCP          : PASS after TX/RX swap on CN10 @ 115200
+board_bringup     : PASS (LED, BUTTON, Console)
+platform smoke    : PASS (3/3 ztest on-device)
+zplatform_demo    : PASS (peripherals + shell `zplatform info`)
+MCUboot + signed  : PASS (v2.4.0 → slot0 v1.0.0 → demo banner)
+                  : bootloader ~28 KiB / 64 KiB; ECDSA-P256
 ```
 
 Correct VCP wiring (confirmed on hardware):

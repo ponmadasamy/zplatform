@@ -43,14 +43,20 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 if ($Clean -and (Test-Path $buildDir)) { Remove-Item -Recurse -Force $buildDir }
 New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
 
+# CMake/DTS path args must use forward slashes on Windows (backslash
+# escapes break DTC_OVERLAY_FILE / BOARD_ROOT parsing under newer CMake).
+$rootFwd = ($script:ZPlatformRoot -replace '\\', '/')
+$buildFwd = ($buildDir -replace '\\', '/')
+$appFwd = ($app.Path -replace '\\', '/')
+
 $cmakeArgs = @(
-    "-b", $Board, "-d", $buildDir, $app.Path, "--",
-    "-DBOARD_ROOT=$($script:ZPlatformRoot)",
-    "-DZEPHYR_EXTRA_MODULES=$($script:ZPlatformRoot)"
+    "-b", $Board, "-d", $buildFwd, $appFwd, "--",
+    "-DBOARD_ROOT=$rootFwd",
+    "-DZEPHYR_EXTRA_MODULES=$rootFwd"
 ) + $Extra
 
 if ($Mcuboot) {
-    $overlay = Join-Path $script:ZPlatformRoot "boards\st\stm3210e_eval\stm3210e_eval_mcuboot.overlay"
+    $overlay = "$rootFwd/boards/st/stm3210e_eval/stm3210e_eval_mcuboot.overlay"
     $cmakeArgs += "-DCONFIG_BOOTLOADER_MCUBOOT=y"
     $cmakeArgs += "-DDTC_OVERLAY_FILE=$overlay"
 }

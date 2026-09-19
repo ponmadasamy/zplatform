@@ -17,7 +17,7 @@ source "${SCRIPT_DIR}/common.sh"
 
 ROOT="$(zplatform_root)"
 BOARD="${ZPLATFORM_DEFAULT_BOARD}"
-KEY="${ROOT}/keys/root-rsa-2048.pem"
+KEY="${ROOT}/keys/root-ec-p256.pem"
 
 zplatform_setup_env
 zplatform_require_cmd west
