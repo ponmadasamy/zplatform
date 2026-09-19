@@ -3,11 +3,13 @@
 ## Recommended flow
 
 ```text
-ST-Link (SWD)
+STLINK-V3MINI (+ adapter) → CN9 SWD
    → OpenOCD / J-Link GDB server
    → arm-zephyr-eabi-gdb
    → zephyr.elf
 ```
+
+Board cabling: [STM3210E-EVAL hardware connection](../boards/stm3210e_eval.md#hardware-connection-stlink-v3mini).
 
 ```bash
 ./scripts/sh/build.sh demo --board stm3210e_eval --debug
@@ -43,7 +45,7 @@ Use a `launch.json` that points GDB at:
 build/<board>/<app>/<cfg>/zephyr/zephyr.elf
 ```
 
-and starts OpenOCD with `boards/st/stm3210e_eval/support/openocd.cfg`,
+and starts OpenOCD with `boards/st/stm3210e_eval/support/openocd-swd.cfg`,
 or simply rely on `west debug` from the integrated terminal.
 
 ## Runners
