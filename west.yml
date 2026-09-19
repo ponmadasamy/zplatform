@@ -1,0 +1,28 @@
+# Copyright (c) 2026 ZPlatform contributors
+# SPDX-License-Identifier: Apache-2.0
+
+manifest:
+  version: "1.2"
+
+  self:
+    path: zplatform
+
+  remotes:
+    - name: zephyrproject-rtos
+      url-base: https://github.com/zephyrproject-rtos
+
+  projects:
+    - name: zephyr
+      remote: zephyrproject-rtos
+      revision: v4.4.0
+      import:
+        # Clone only modules required for STM32F1 / STM3210E-EVAL bring-up.
+        name-allowlist:
+          - cmsis_6
+          - hal_stm32
+          - mcuboot
+          - mbedtls
+          - segger
+          - tinycrypt
+          - net-tools
+          - zcbor

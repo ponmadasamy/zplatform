@@ -1,0 +1,41 @@
+# Copyright (c) 2026 ZPlatform contributors
+# SPDX-License-Identifier: Apache-2.0
+
+menu "ZPlatform"
+
+config ZPLATFORM
+	bool "Enable ZPlatform support"
+	default y
+	help
+	  Enable ZPlatform platform services and helpers.
+
+config ZPLATFORM_LIB_COMMON
+	bool "ZPlatform common library"
+	depends on ZPLATFORM
+	default y
+	help
+	  Common helpers: version, board identity, system info.
+
+config ZPLATFORM_LIB_DIAGNOSTICS
+	bool "ZPlatform diagnostics library"
+	depends on ZPLATFORM
+	default y
+	help
+	  Runtime diagnostics: memory, threads, stack usage helpers.
+
+config ZPLATFORM_SHELL
+	bool "ZPlatform shell commands"
+	depends on ZPLATFORM && SHELL
+	default y
+	help
+	  Register zplatform.* shell commands for development.
+
+config ZPLATFORM_PROFILING
+	bool "ZPlatform profiling helpers"
+	depends on ZPLATFORM
+	default n
+	help
+	  Enable optional profiling instrumentation (cycle counters,
+	  timing helpers). Keep disabled for normal builds.
+
+endmenu
