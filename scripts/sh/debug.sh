@@ -43,7 +43,6 @@ while [[ $# -gt 0 ]]; do
 done
 
 zplatform_setup_env
-zplatform_require_cmd west
 zplatform_read_last_build
 
 BUILD_DIR="${build_dir}"
@@ -73,4 +72,4 @@ echo "  info threads"
 echo "  monitor reset halt"
 echo
 
-west debug "${ARGS[@]}"
+zplatform_west debug "${ARGS[@]}"

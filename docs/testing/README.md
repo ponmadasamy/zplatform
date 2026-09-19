@@ -15,9 +15,9 @@ tests/
 ## Commands
 
 ```bash
-./scripts/test.sh
-./scripts/test.sh platform/smoke
-./scripts/test.sh --native
+./scripts/sh/test.sh
+./scripts/sh/test.sh platform/smoke
+./scripts/sh/test.sh --native
 ```
 
 ## Result honesty
@@ -29,4 +29,4 @@ tests/
 | HARDWARE VERIFIED | Ran on physical target with observed PASS |
 | HARDWARE NOT VERIFIED | No physical execution claimed |
 
-Default `./scripts/test.sh` uses `--build-only` for `stm3210e_eval`.
+Default `./scripts/sh/test.sh` uses `--build-only` for `stm3210e_eval`.

@@ -1,0 +1,46 @@
+# Copyright (c) 2026 ZPlatform contributors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Single source of truth for the ZPlatform Zephyr environment.
+# Scripts, west.yml, README, and CI must derive from or validate against this file.
+# Do not edit Zephyr revision in west.yml independently — run:
+#   ./scripts/sh/setup-zephyr.sh --sync-manifest
+
+zephyr:
+  # Release line (major.minor). Used for --check-latest within-line awareness.
+  release: "4.4"
+  # Exact reproducible version string (informational / reports).
+  version: "4.4.2"
+  # Git tag / revision consumed by west (authoritative lock).
+  revision: "v4.4.2"
+
+sdk:
+  # Zephyr 4.4 requires Zephyr SDK >= 1.0.0
+  # Existing older SDKs (e.g. 0.17.x) are left installed and unused by ZPlatform.
+  minimum_version: "1.0.0"
+
+python:
+  minimum_version: "3.12"
+
+cmake:
+  minimum_version: "3.28.0"
+
+tools:
+  west: {}
+  cmake: {}
+  ninja: {}
+  git: {}
+
+workspace:
+  # Default west workspace under $HOME — same as Zephyr getting-started.
+  # ZPlatform adopts/updates this tree (rewrites .west/config to manifest=zplatform).
+  # Override with env ZPLATFORM_WEST_WORKSPACE for a different path.
+  default_name: "zephyrproject"
+  # Former sibling layout name (still mentioned in migration notes).
+  isolated_name: "zplatform-ws"
+
+target:
+  arch: "arm"
+  cpu: "cortex-m3"
+  series: "stm32f1"
+  default_board: "stm3210e_eval"

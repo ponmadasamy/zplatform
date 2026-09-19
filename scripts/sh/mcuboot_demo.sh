@@ -50,6 +50,7 @@ west build -b "${BOARD}" -d "${MCUBOOT_DIR}" \
 	-DDTC_OVERLAY_FILE="${ROOT}/boards/st/stm3210e_eval/support/mcuboot.overlay"
 
 echo "=== 2) Build signed application v1 ==="
+# Public entry: ./scripts/sh/build.sh
 "${SCRIPT_DIR}/build.sh" demo --board "${BOARD}" --mcuboot
 APP_DIR="$(zplatform_build_dir "${BOARD}" demo mcuboot)"
 BIN_V1="${APP_DIR}/zephyr/zephyr.bin"

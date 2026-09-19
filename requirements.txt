@@ -1,0 +1,10 @@
+# Copyright (c) 2026 ZPlatform contributors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Bootstrap / host Python packages for the ZPlatform environment manager.
+# Zephyr's own requirements are installed from the checked-out tree via
+# `west packages` / scripts/requirements.txt after west update.
+
+west>=1.2.0
+PyYAML>=6.0
+requests>=2.28.0

@@ -5,8 +5,8 @@
 # Build a ZPlatform demo or sample.
 #
 # Usage:
-#   ./scripts/build.sh demo [--board BOARD] [--clean] [--debug|--release] [--mcuboot]
-#   ./scripts/build.sh sample board_bringup [--board BOARD] ...
+#   ./scripts/sh/build.sh demo [--board BOARD] [--clean] [--debug|--release] [--mcuboot]
+#   ./scripts/sh/build.sh sample board_bringup [--board BOARD] ...
 
 set -euo pipefail
 
@@ -93,11 +93,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 zplatform_setup_env
-zplatform_require_cmd west
 zplatform_resolve_app "${KIND}" "${NAME}"
 
 BUILD_DIR="$(zplatform_build_dir "${BOARD}" "${APP_NAME}" "${CFG}")"
 ROOT="$(zplatform_root)"
+
+zplatform_print_build_banner "${BOARD}" "${APP_NAME}" "${CFG}"
 
 if [[ "${CLEAN}" -eq 1 && -d "${BUILD_DIR}" ]]; then
 	echo "Cleaning ${BUILD_DIR}"
@@ -134,10 +135,12 @@ if [[ -n "${EXTRA_CONF}" ]]; then
 fi
 
 echo "Executing: west build ${CMAKE_ARGS[*]}"
-west build "${CMAKE_ARGS[@]}"
+zplatform_west build "${CMAKE_ARGS[@]}"
 
 zplatform_write_last_build "${BOARD}" "${APP_NAME}" "${BUILD_DIR}" "${CFG}" "${APP_KIND}"
+zplatform_write_fingerprint "${BOARD}" "${APP_NAME}" "${BUILD_DIR}"
 
 echo
 echo "Build complete: ${BUILD_DIR}"
 ls -1 "${BUILD_DIR}/zephyr/"zephyr.{elf,bin,hex,map} 2>/dev/null || true
+ls -1 "${BUILD_DIR}/zplatform-environment".{txt,json} 2>/dev/null || true

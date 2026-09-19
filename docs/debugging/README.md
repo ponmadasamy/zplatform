@@ -10,8 +10,8 @@ ST-Link (SWD)
 ```
 
 ```bash
-./scripts/build.sh demo --board stm3210e_eval --debug
-./scripts/debug.sh
+./scripts/sh/build.sh demo --board stm3210e_eval --debug
+./scripts/sh/debug.sh
 ```
 
 ## GDB essentials
@@ -55,6 +55,6 @@ or simply rely on `west debug` from the integrated terminal.
 | jlink | SEGGER probe |
 
 ```bash
-./scripts/flash.sh --runner openocd
-./scripts/debug.sh --runner jlink
+./scripts/sh/flash.sh --runner openocd
+./scripts/sh/debug.sh --runner jlink
 ```

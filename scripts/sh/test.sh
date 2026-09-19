@@ -48,7 +48,6 @@ while [[ $# -gt 0 ]]; do
 done
 
 zplatform_setup_env
-zplatform_require_cmd west
 
 OUTDIR="${ROOT}/build/twister"
 mkdir -p "${OUTDIR}"
@@ -62,6 +61,14 @@ if [[ ! -d "${TEST_ROOT}" ]]; then
 	echo "error: test path not found: ${TEST_ROOT}" >&2
 	exit 1
 fi
+
+echo "========================================"
+echo "ZPlatform Twister"
+echo "========================================"
+echo "ZEPHYR_BASE : ${ZEPHYR_BASE}"
+echo "Workspace   : ${ZPLATFORM_WEST_WORKSPACE}"
+echo "west        : ${ZPLATFORM_WEST}"
+echo "========================================"
 
 ARGS=(
 	-T "${TEST_ROOT}"
@@ -81,4 +88,4 @@ else
 fi
 
 echo "Executing: west twister ${ARGS[*]}"
-west twister "${ARGS[@]}"
+zplatform_west twister "${ARGS[@]}"

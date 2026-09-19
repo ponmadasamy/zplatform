@@ -49,33 +49,42 @@ Do not fork Zephyr. Do not vendor the Zephyr tree inside this repository.
 Preferred layout:
 
 ```text
-workspace/
-├── .west/
-├── zephyr/          # upstream (revision pinned in west.yml)
+~/zephyrproject/          # west topdir (or $ZPLATFORM_WEST_WORKSPACE)
+├── .west/config          # manifest.path = absolute path to zplatform clone
+├── zephyr/               # pinned in west.yml
 ├── bootloader/
-├── modules/
-└── zplatform/       # this repository
+└── modules/
 ```
 
-Initialize:
+The ZPlatform git clone can live anywhere (even another drive). No
+`zplatform/` junction inside the workspace.
+
+Initialize (default workspace is `~/zephyrproject`):
 
 ```bash
-mkdir zplatform-ws && cd zplatform-ws
-west init -m git@github.com:ponmadasamy/zplatform.git
-west update
+./scripts/sh/setup-zephyr.sh --sync
 ```
 
-Or with an existing clone:
+Or point elsewhere:
 
 ```bash
-mkdir zplatform-ws && cd zplatform-ws
-west init -l /path/to/zplatform
-west update
+export ZPLATFORM_WEST_WORKSPACE=/path/to/custom-ws
+./scripts/sh/setup-zephyr.sh --sync
+```
+
+Manual west (optional):
+
+```bash
+# .west/config is written by setup-zephyr; prefer that over west init -l
+./scripts/sh/setup-zephyr.sh --sync
 ```
 
 ## Zephyr version
 
-Pinned in `west.yml`: **v4.4.0** (latest stable at workspace creation).
+Pinned via `config/toolchain.yml` → `west.yml`: **v4.4.2** (Zephyr 4.4 line).
+
+Use `./scripts/sh/setup-zephyr.sh --check-latest` to discover newer stables without
+changing the pin. See [Environment manager](../environment.md).
 
 ## DeviceTree vs Kconfig
 

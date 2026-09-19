@@ -67,16 +67,16 @@ boards, use an **external ST-Link/V2** (or J-Link).
 Default Zephyr runner: OpenOCD (`support/openocd.cfg`).
 
 ```bash
-./scripts/build.sh demo --board stm3210e_eval
-./scripts/flash.sh
-./scripts/debug.sh
+./scripts/sh/build.sh demo --board stm3210e_eval
+./scripts/sh/flash.sh
+./scripts/sh/debug.sh
 ```
 
 ## Build
 
 ```bash
-./scripts/build.sh sample board_bringup --board stm3210e_eval
-./scripts/build.sh demo --board stm3210e_eval
+./scripts/sh/build.sh sample board_bringup --board stm3210e_eval
+./scripts/sh/build.sh demo --board stm3210e_eval
 ```
 
 Artifacts: `build/stm3210e_eval/<app>/<cfg>/zephyr/zephyr.{elf,bin,hex,map}`
@@ -97,12 +97,12 @@ Absolute Flash base: `0x08000000`.
 Swap mode: `CONFIG_BOOT_SWAP_USING_MOVE=y` (no scratch partition).
 
 See `support/mcuboot.conf`, `stm3210e_eval_mcuboot.overlay`, and
-`scripts/mcuboot_demo.sh`.
+`./scripts/sh/mcuboot_demo.sh`.
 
 ## Profiling
 
 ```bash
-./scripts/profile.sh demo --board stm3210e_eval
+./scripts/sh/profile.sh demo --board stm3210e_eval
 ```
 
 Uses DWT CYCCNT (Cortex-M3), thread runtime stats, and stack watermarks.
@@ -111,8 +111,8 @@ SystemView is optional and not enabled by default.
 ## Ztest
 
 ```bash
-./scripts/test.sh
-./scripts/test.sh platform/smoke
+./scripts/sh/test.sh
+./scripts/sh/test.sh platform/smoke
 ```
 
 Default script mode is **build-only** for `stm3210e_eval` (no claim of

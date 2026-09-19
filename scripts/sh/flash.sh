@@ -61,7 +61,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 zplatform_setup_env
-zplatform_require_cmd west
+# Flash/debug tools are required only for flash — not for build.
+ROOT_PY="$(zplatform_venv_python)"
+ROOT="$(zplatform_root)"
+"${ROOT_PY}" "${ROOT}/scripts/env/zplatform_env.py" --ensure --require-flash-tools >/dev/null
 
 if [[ -n "${KIND}" ]]; then
 	zplatform_resolve_app "${KIND}" "${NAME}"
@@ -110,6 +113,6 @@ if [[ -n "${RUNNER}" ]]; then
 fi
 
 echo "Executing: west flash ${FLASH_ARGS[*]}"
-west flash "${FLASH_ARGS[@]}"
+zplatform_west flash "${FLASH_ARGS[@]}"
 
 echo "Flash complete. Target should reset via the selected runner."

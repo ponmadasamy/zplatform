@@ -55,7 +55,6 @@ while [[ $# -gt 0 ]]; do
 done
 
 zplatform_setup_env
-zplatform_require_cmd west
 zplatform_resolve_app "${KIND}" "${NAME}"
 
 ROOT="$(zplatform_root)"
@@ -63,7 +62,6 @@ BUILD_DIR="$(zplatform_build_dir "${BOARD}" "${APP_NAME}" profile)"
 CONF_FILE="${ROOT}/demo/zplatform_demo/prj_profile.conf"
 
 if [[ "${APP_KIND}" == "sample" ]]; then
-	# Fall back to demo profile conf overlays via -D flags
 	CONF_FILE=""
 fi
 
@@ -88,8 +86,9 @@ if [[ -n "${CONF_FILE}" && -f "${CONF_FILE}" ]]; then
 fi
 
 echo "Executing: west build ${ARGS[*]}"
-west build "${ARGS[@]}"
+zplatform_west build "${ARGS[@]}"
 zplatform_write_last_build "${BOARD}" "${APP_NAME}" "${BUILD_DIR}" "profile" "${APP_KIND}"
+zplatform_write_fingerprint "${BOARD}" "${APP_NAME}" "${BUILD_DIR}"
 
 cat <<EOF
 

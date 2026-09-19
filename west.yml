@@ -4,8 +4,8 @@
 manifest:
   version: "1.2"
 
-  self:
-    path: zplatform
+  # Manifest repo path comes from the workspace .west/config (absolute path to
+  # this clone). Do not require a workspace/zplatform junction.
 
   remotes:
     - name: zephyrproject-rtos
@@ -14,9 +14,10 @@ manifest:
   projects:
     - name: zephyr
       remote: zephyrproject-rtos
-      revision: v4.4.0
+      # KEEP IN SYNC with config/toolchain.yml (zephyr.revision).
+      # Validated by scripts/env/zplatform_env.py — do not edit alone.
+      revision: v4.4.2
       import:
-        # Clone only modules required for STM32F1 / STM3210E-EVAL bring-up.
         name-allowlist:
           - cmsis_6
           - hal_stm32
