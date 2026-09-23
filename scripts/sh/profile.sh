@@ -55,13 +55,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 zplatform_setup_env
-zplatform_resolve_app "${KIND}" "${NAME}"
+zplatform_resolve_app "${KIND}" "${NAME}" "${BOARD}"
 
 ROOT="$(zplatform_root)"
-BUILD_DIR="$(zplatform_build_dir "${BOARD}" "${APP_NAME}" profile)"
-CONF_FILE="${ROOT}/demo/zplatform_demo/prj_profile.conf"
+BUILD_DIR="$(zplatform_build_dir "${BOARD}" "${APP_KIND}" "${APP_NAME}" profile)"
+CONF_FILE="${APP_PATH}/prj_profile.conf"
 
-if [[ "${APP_KIND}" == "sample" ]]; then
+if [[ "${APP_KIND}" == "sample" || ! -f "${CONF_FILE}" ]]; then
 	CONF_FILE=""
 fi
 

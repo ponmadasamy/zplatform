@@ -51,8 +51,7 @@ function Ensure-Venv {
     }
     Write-Host "Bootstrapping .venv with $($py.Exe) $($py.Args -join ' ')"
     & $py.Exe @($py.Args) -m venv (Join-Path $Root ".venv")
-    & $VenvPy -m pip install --upgrade pip
-    & $VenvPy -m pip install -r (Join-Path $Root "requirements.txt")
+    # Pip/requirements: single path via zplatform_env.py --ensure (hash-stamped).
 }
 
 if ($Help) {

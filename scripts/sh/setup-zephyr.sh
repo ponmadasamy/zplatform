@@ -32,7 +32,7 @@ find_python() {
 }
 
 bootstrap_venv() {
-	local py vpy
+	local py
 	if [[ -x "${ROOT}/.venv/bin/python" ]]; then
 		return 0
 	fi
@@ -46,13 +46,7 @@ bootstrap_venv() {
 	fi
 	echo "Bootstrapping .venv with ${py}"
 	"${py}" -m venv "${ROOT}/.venv"
-	if [[ -x "${ROOT}/.venv/bin/python" ]]; then
-		vpy="${ROOT}/.venv/bin/python"
-	else
-		vpy="${ROOT}/.venv/Scripts/python.exe"
-	fi
-	"${vpy}" -m pip install --upgrade pip
-	"${vpy}" -m pip install -r "${ROOT}/requirements.txt"
+	# Pip/requirements: single path via zplatform_env.py --ensure (hash-stamped).
 }
 
 venv_python() {

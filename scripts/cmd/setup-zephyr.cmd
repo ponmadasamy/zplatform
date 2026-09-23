@@ -59,9 +59,7 @@ if not exist "%ZPLATFORM_PY%" (
   echo Bootstrapping .venv with %BOOT_PY%
   %BOOT_PY% -m venv "%ZPLATFORM_ROOT%\.venv"
   if errorlevel 1 exit /b 1
-  "%ZPLATFORM_PY%" -m pip install --upgrade pip
-  "%ZPLATFORM_PY%" -m pip install -r "%ZPLATFORM_ROOT%\requirements.txt"
-  if errorlevel 1 exit /b 1
+  rem Pip/requirements: single path via zplatform_env.py --ensure (hash-stamped).
 )
 
 set "PY_ARGS=%ZPLATFORM_ENV_PY%"

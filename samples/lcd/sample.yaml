@@ -1,0 +1,14 @@
+sample:
+  name: ZPlatform LCD sample
+tests:
+  sample.zplatform.lcd:
+    tags: lcd display fsmc
+    platform_allow:
+      - stm3210e_eval
+    harness: console
+    harness_config:
+      type: multi_line
+      regex:
+        - "LCD sample"
+        - "\\[PASS\\] display"
+        - "\\[PASS\\] display_write"

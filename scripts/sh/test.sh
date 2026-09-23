@@ -49,6 +49,19 @@ done
 
 zplatform_setup_env
 
+# Twister uses os.path.relpath against ZEPHYR_BASE; fails across Windows drives.
+if [[ -n "${ZPLATFORM_WEST_WORKSPACE:-}" ]]; then
+	_repo_drv="$(printf '%s' "${ROOT}" | tr '[:upper:]' '[:lower:]' | cut -c1-2)"
+	_ws_drv="$(printf '%s' "${ZPLATFORM_WEST_WORKSPACE}" | tr '[:upper:]' '[:lower:]' | cut -c1-2)"
+	if [[ "${_repo_drv}" != "${_ws_drv}" && "${_repo_drv}" =~ ^[a-z]:$ ]]; then
+		echo "error: twister cannot load tests across Windows drives." >&2
+		echo "  repo      : ${ROOT}" >&2
+		echo "  workspace : ${ZPLATFORM_WEST_WORKSPACE}" >&2
+		echo "Put zplatform on the same drive as the west workspace." >&2
+		exit 1
+	fi
+fi
+
 OUTDIR="${ROOT}/build/twister"
 mkdir -p "${OUTDIR}"
 

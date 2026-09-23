@@ -43,6 +43,13 @@ if [[ $# -lt 1 ]]; then
 	exit 1
 fi
 
+case "$1" in
+-h|--help)
+	usage
+	exit 0
+	;;
+esac
+
 KIND="$1"
 shift
 
@@ -93,16 +100,15 @@ while [[ $# -gt 0 ]]; do
 done
 
 zplatform_setup_env
-zplatform_resolve_app "${KIND}" "${NAME}"
+zplatform_resolve_app "${KIND}" "${NAME}" "${BOARD}"
 
-BUILD_DIR="$(zplatform_build_dir "${BOARD}" "${APP_NAME}" "${CFG}")"
+BUILD_DIR="$(zplatform_build_dir "${BOARD}" "${APP_KIND}" "${APP_NAME}" "${CFG}")"
 ROOT="$(zplatform_root)"
 
 zplatform_print_build_banner "${BOARD}" "${APP_NAME}" "${CFG}"
 
-if [[ "${CLEAN}" -eq 1 && -d "${BUILD_DIR}" ]]; then
-	echo "Cleaning ${BUILD_DIR}"
-	rm -rf "${BUILD_DIR}"
+if [[ "${CLEAN}" -eq 1 ]]; then
+	zplatform_remove_build --board "${BOARD}" --kind "${APP_KIND}" --name "${APP_NAME}" --config "${CFG}"
 fi
 
 mkdir -p "${BUILD_DIR}"
@@ -118,8 +124,24 @@ CMAKE_ARGS=(
 
 OVERLAYS=()
 if [[ "${MCUBOOT}" -eq 1 ]]; then
-	OVERLAYS+=("${ROOT}/boards/st/stm3210e_eval/stm3210e_eval_mcuboot.overlay")
+	OVERLAY="${ROOT}/boards/st/${BOARD}/${BOARD}_mcuboot.overlay"
+	if [[ ! -f "${OVERLAY}" ]]; then
+		echo "error: MCUboot overlay not found for board ${BOARD} (expected ${OVERLAY})" >&2
+		exit 1
+	fi
+	OVERLAYS+=("${OVERLAY}")
+	CMAKE_ARGS+=("-DZPLATFORM_ROOT=${ROOT}")
 	CMAKE_ARGS+=("-DCONFIG_BOOTLOADER_MCUBOOT=y")
+	CMAKE_ARGS+=("-DCONFIG_STREAM_FLASH=y")
+	CMAKE_ARGS+=("-DCONFIG_IMG_MANAGER=y")
+	CMAKE_ARGS+=("-DCONFIG_MCUBOOT_IMG_MANAGER=y")
+	if [[ ! -f "${ROOT}/keys/root-ec-p256.pem" ]]; then
+		echo "error: missing ${ROOT}/keys/root-ec-p256.pem — see keys/README.md" >&2
+		exit 1
+	fi
+	if [[ -f "${APP_PATH}/prj_mcuboot.conf" ]]; then
+		CMAKE_ARGS+=("-DEXTRA_CONF_FILE=${APP_PATH}/prj_mcuboot.conf")
+	fi
 fi
 
 if [[ ${#OVERLAYS[@]} -gt 0 ]]; then
@@ -139,6 +161,7 @@ zplatform_west build "${CMAKE_ARGS[@]}"
 
 zplatform_write_last_build "${BOARD}" "${APP_NAME}" "${BUILD_DIR}" "${CFG}" "${APP_KIND}"
 zplatform_write_fingerprint "${BOARD}" "${APP_NAME}" "${BUILD_DIR}"
+"$(zplatform_venv_python)" "$(zplatform_root)/scripts/env/zplatform_env.py" --print-layout "${BUILD_DIR}" || true
 
 echo
 echo "Build complete: ${BUILD_DIR}"

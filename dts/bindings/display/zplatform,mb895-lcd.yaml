@@ -1,0 +1,8 @@
+# Copyright (c) 2026 ZPlatform contributors
+# SPDX-License-Identifier: Apache-2.0
+
+description: STM3210E-EVAL MB895 TFT (FSMC bank4 index/data LCD)
+
+compatible: "zplatform,mb895-lcd"
+
+include: lcd-controller.yaml

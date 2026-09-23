@@ -10,6 +10,7 @@ Invoked by setup-zephyr.sh / setup-zephyr.ps1 and by build/test/flash scripts.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import platform
@@ -264,13 +265,26 @@ def ensure_host_python(cfg: dict[str, Any]) -> None:
 def ensure_venv(cfg: dict[str, Any]) -> Path:
     ensure_host_python(cfg)
     py = venv_python()
+    created = False
     if not py.is_file():
         info(f"Creating project venv at {venv_dir()}")
         venv.EnvBuilder(with_pip=True, clear=False).create(venv_dir())
-    # Install bootstrap requirements
+        created = True
+
+    # Only re-run pip when the venv is new or requirements.txt changed.
+    # Avoids "Requirement already satisfied" spam on every build/flash.
     req = repo_root() / "requirements.txt"
-    run([str(py), "-m", "pip", "install", "--upgrade", "pip"], check=True)
-    run([str(py), "-m", "pip", "install", "-r", str(req)], check=True)
+    stamp = venv_dir() / ".zplatform-requirements.sha256"
+    digest = ""
+    if req.is_file():
+        digest = hashlib.sha256(req.read_bytes()).hexdigest()
+    need_pip = created or not stamp.is_file() or stamp.read_text(encoding="utf-8").strip() != digest
+    if need_pip:
+        info("Installing/updating project venv requirements")
+        run([str(py), "-m", "pip", "install", "-q", "--upgrade", "pip"], check=True)
+        if req.is_file():
+            run([str(py), "-m", "pip", "install", "-q", "-r", str(req)], check=True)
+        stamp.write_text(digest + "\n", encoding="utf-8")
     return py
 
 
@@ -470,7 +484,7 @@ def ensure_workspace(cfg: dict[str, Any], *, sync: bool = False) -> Path:
         zephyr_req = ws / "zephyr" / "scripts" / "requirements.txt"
         if zephyr_req.is_file():
             run(
-                [str(venv_python()), "-m", "pip", "install", "-r", str(zephyr_req)],
+                [str(venv_python()), "-m", "pip", "install", "-q", "-r", str(zephyr_req)],
                 check=False,
             )
     return ws
@@ -1025,6 +1039,133 @@ def print_build_banner(
     print()
 
 
+def _fmt_size(n: int) -> str:
+    if n >= 1024 * 1024 and n % (1024 * 1024) == 0:
+        return f"{n // (1024 * 1024)} MiB"
+    if n >= 1024 and n % 1024 == 0:
+        return f"{n // 1024} KiB"
+    return f"{n} B"
+
+
+def print_flash_layout(build_dir: Path) -> int:
+    """Print linker FLASH region + DTS fixed-partitions after a west build.
+
+    Sourced from the build tree (zephyr/linker.cmd, .config, zephyr.dts) so the
+    summary matches what was actually linked — default vs -Mcuboot differ here.
+    """
+    build_dir = Path(build_dir)
+    zephyr = build_dir / "zephyr"
+    linker = zephyr / "linker.cmd"
+    config = zephyr / ".config"
+    dts = zephyr / "zephyr.dts"
+
+    if not zephyr.is_dir():
+        print(f"error: no zephyr/ under {build_dir}", file=sys.stderr)
+        return 1
+
+    print()
+    print("Flash / code layout (from this build)")
+    print("-------------------------------------")
+
+    # Linker MEMORY FLASH line (what the "Memory region FLASH" summary uses).
+    if linker.is_file():
+        text = linker.read_text(encoding="utf-8", errors="replace")
+        m = re.search(
+            r"FLASH\s*\([^)]*\)\s*:\s*ORIGIN\s*=\s*\(([^)]+)\),\s*LENGTH\s*=\s*\(([^)]+)\)",
+            text,
+        )
+        if m:
+            print(f"  Linker FLASH : ORIGIN = ({m.group(1).strip()})")
+            print(f"                 LENGTH = ({m.group(2).strip()})")
+        else:
+            m2 = re.search(r"FLASH\s*\([^)]*\)\s*:\s*ORIGIN\s*=\s*([^,]+),\s*LENGTH\s*=\s*([^\n]+)", text)
+            if m2:
+                print(f"  Linker FLASH : ORIGIN = {m2.group(1).strip()}")
+                print(f"                 LENGTH = {m2.group(2).strip()}")
+
+    load_off = load_sz = rom_off = None
+    if config.is_file():
+        cfg_txt = config.read_text(encoding="utf-8", errors="replace")
+
+        def _cfg_int(name: str) -> Optional[int]:
+            mm = re.search(rf"^CONFIG_{name}=(0x[0-9a-fA-F]+|\d+)\s*$", cfg_txt, re.M)
+            if not mm:
+                return None
+            return int(mm.group(1), 0)
+
+        load_off = _cfg_int("FLASH_LOAD_OFFSET")
+        load_sz = _cfg_int("FLASH_LOAD_SIZE")
+        rom_off = _cfg_int("ROM_START_OFFSET")
+        if load_off is not None:
+            print(f"  LOAD_OFFSET  : 0x{load_off:X}  (image linked at flash base + offset)")
+        if load_sz is not None and load_sz > 0:
+            print(f"  LOAD_SIZE    : 0x{load_sz:X} ({_fmt_size(load_sz)})  (max image for this link)")
+        elif load_sz == 0:
+            print("  LOAD_SIZE    : 0 (use full remaining flash - typical without code-partition)")
+        if rom_off is not None:
+            print(f"  ROM_START_OFF: 0x{rom_off:X}  (MCUboot header reserve when non-zero)")
+
+    code_part = None
+    if dts.is_file():
+        dts_txt = dts.read_text(encoding="utf-8", errors="replace")
+        cm = re.search(r"zephyr,code-partition\s*=\s*&([A-Za-z0-9_]+)\s*;", dts_txt)
+        if cm:
+            code_part = cm.group(1)
+            print(f"  code-partition: &{code_part}  (chosen; drives linker FLASH)")
+        else:
+            print("  code-partition: (none)  - app uses whole flash from 0x08000000")
+
+        # fixed-partitions children: label + reg
+        parts: list[tuple[str, str, int, int]] = []
+        for pm in re.finditer(
+            r"([A-Za-z0-9_]+):\s*partition@[0-9a-fA-F]+\s*\{([^}]*)\}",
+            dts_txt,
+            re.S,
+        ):
+            node, body = pm.group(1), pm.group(2)
+            lm = re.search(r'label\s*=\s*"([^"]+)"', body)
+            rm = re.search(r"reg\s*=\s*<\s*(0x[0-9a-fA-F]+|\d+)\s+(0x[0-9a-fA-F]+|\d+)\s*>", body)
+            if not lm or not rm:
+                continue
+            off = int(rm.group(1), 0)
+            size = int(rm.group(2), 0)
+            parts.append((node, lm.group(1), off, size))
+
+        if parts:
+            print()
+            print("  DTS fixed-partitions (absolute Flash = 0x08000000 + offset):")
+            print(f"  {'Node':<22} {'Label':<12} {'Offset':>10} {'Size':>10} {'Abs start':>12}  Role")
+            for node, label, off, size in parts:
+                abs_addr = 0x08000000 + off
+                role = ""
+                if code_part and node == code_part:
+                    role = "<- THIS IMAGE"
+                elif label == "code":
+                    role = "standalone app"
+                elif label == "mcuboot":
+                    role = "bootloader"
+                elif label == "image-0":
+                    role = "primary slot"
+                elif label == "image-1":
+                    role = "upgrade slot"
+                elif label == "storage":
+                    role = "settings/NVS"
+                mark = "*" if role.startswith("<-") else " "
+                print(
+                    f"  {mark}{node:<21} {label:<12} 0x{off:08X} {_fmt_size(size):>10} "
+                    f"0x{abs_addr:08X}  {role}"
+                )
+
+    print()
+    print("  Edit partitions :")
+    print("    standalone : boards/.../<board>.dts  (single code_partition)")
+    print("    MCUboot map: boards/.../support/partitions_mcuboot.dtsi")
+    print("    App->slot0 : boards/.../<board>_mcuboot.overlay")
+    print("    Boot link  : boards/.../support/mcuboot.overlay")
+    print()
+    return 0
+
+
 def write_env_fingerprint(
     build_dir: Path,
     report: EnvReport,
@@ -1269,6 +1410,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--install-sdk", action="store_true", default=True)
     parser.add_argument("--no-install-sdk", action="store_true")
     parser.add_argument("--write-fingerprint", metavar="BUILD_DIR")
+    parser.add_argument(
+        "--print-layout",
+        metavar="BUILD_DIR",
+        help="print flash partitions + linker LOAD_* from a finished build dir",
+    )
     parser.add_argument("--board", default="")
     parser.add_argument("--application", default="")
     parser.add_argument("--config-name", default="default")
@@ -1286,6 +1432,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.check_latest or args.update:
         return check_latest(cfg)
 
+    if args.print_layout:
+        return print_flash_layout(Path(args.print_layout))
+
     if args.status and not args.ensure and not args.sync:
         # Light status may run before venv — try gather with what we have
         if not venv_python().is_file():
@@ -1301,30 +1450,47 @@ def main(argv: Optional[list[str]] = None) -> int:
         or args.sync
         or args.print_env
         or args.print_env_cmd
+    )
+    # Banner / fingerprint / flash-tool check can reuse an already-ensured env
+    # (wrappers call Initialize / --ensure first). Avoid triple pip/ensure noise.
+    need_report = (
+        need_ensure
         or args.banner
         or args.write_fingerprint
+        or args.require_flash_tools
+        or args.status
     )
-    if need_ensure:
-        # --ensure validates/creates; --sync alone forces west update.
-        # (Mismatch still triggers west update inside cmd_ensure.)
-        quiet_stdout = (
-            (args.print_env or args.print_env_cmd)
-            and not args.banner
-            and not args.status
-        )
-        global _REDIRECT_CHILD_STDOUT
-        if quiet_stdout:
-            # Keep machine-readable output alone on stdout; send tool noise to stderr.
-            old_out = sys.stdout
-            sys.stdout = sys.stderr
-            _REDIRECT_CHILD_STDOUT = True
-            try:
+    if need_report:
+        report: Optional[EnvReport] = None
+        if need_ensure:
+            # --ensure validates/creates; --sync alone forces west update.
+            # (Mismatch still triggers west update inside cmd_ensure.)
+            quiet_stdout = (
+                (args.print_env or args.print_env_cmd)
+                and not args.banner
+                and not args.status
+            )
+            global _REDIRECT_CHILD_STDOUT
+            if quiet_stdout:
+                # Keep machine-readable output alone on stdout; send tool noise to stderr.
+                old_out = sys.stdout
+                sys.stdout = sys.stderr
+                _REDIRECT_CHILD_STDOUT = True
+                try:
+                    report = cmd_ensure(cfg, sync=args.sync, install_sdk=install_sdk)
+                finally:
+                    _REDIRECT_CHILD_STDOUT = False
+                    sys.stdout = old_out
+            else:
                 report = cmd_ensure(cfg, sync=args.sync, install_sdk=install_sdk)
-            finally:
-                _REDIRECT_CHILD_STDOUT = False
-                sys.stdout = old_out
         else:
-            report = cmd_ensure(cfg, sync=args.sync, install_sdk=install_sdk)
+            if not venv_python().is_file():
+                die("Project venv missing — run ./scripts/sh/setup-zephyr.sh --ensure")
+            report = gather_report(cfg, require_zephyr=True)
+            if not report.ready and (args.banner or args.write_fingerprint):
+                die("environment not ready; run ./scripts/sh/setup-zephyr.sh --sync")
+
+        assert report is not None
         if args.banner:
             print_build_banner(
                 report,

@@ -2,8 +2,10 @@
  * Copyright (c) 2026 ZPlatform contributors
  * SPDX-License-Identifier: Apache-2.0
  *
- * MCUboot bootloader image: runs from boot_partition.
+ * MCUboot bootloader image: multi-slot map + link into boot_partition.
  */
+
+#include "partitions_mcuboot.dtsi"
 
 / {
 	chosen {

@@ -1,0 +1,18 @@
+/*
+ * CAN sample — enable bxCAN, disable USB (shared IRQs 19/20 on F103).
+ * SN65HVD230 CN4; JP8 high-speed (default); JP6 terminator optional.
+ */
+/ {
+	chosen {
+		zephyr,canbus = &can1;
+	};
+};
+
+&usb {
+	status = "disabled";
+};
+
+&can1 {
+	status = "okay";
+	bitrate = <125000>;
+};

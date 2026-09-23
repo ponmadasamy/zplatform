@@ -1,0 +1,17 @@
+/*
+ * Demo enables bxCAN loopback smoke; USB shares F103 IRQs 19/20 so disable it.
+ */
+/ {
+	chosen {
+		zephyr,canbus = &can1;
+	};
+};
+
+&usb {
+	status = "disabled";
+};
+
+&can1 {
+	status = "okay";
+	bitrate = <125000>;
+};

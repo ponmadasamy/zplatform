@@ -69,22 +69,46 @@ goto usage
 call "%ZP_CMD%common.cmd" setup_env
 if errorlevel 1 exit /b 1
 
-call "%ZP_CMD%common.cmd" resolve_app "%KIND%" "%NAME%"
+call "%ZP_CMD%common.cmd" resolve_app "%KIND%" "%NAME%" "%BOARD%"
 if errorlevel 1 exit /b 1
 
-call "%ZP_CMD%common.cmd" build_dir "%BOARD%" "%APP_NAME%" "%CFG%"
+call "%ZP_CMD%common.cmd" build_dir "%BOARD%" "%APP_KIND%" "%APP_NAME%" "%CFG%"
 
-"%ZPLATFORM_PY%" "%ZPLATFORM_ENV_PY%" --ensure --banner --board "%BOARD%" --application "%APP_NAME%" --config-name "%CFG%"
+"%ZPLATFORM_PY%" "%ZPLATFORM_ENV_PY%" --banner --board "%BOARD%" --application "%APP_NAME%" --config-name "%CFG%"
 if errorlevel 1 exit /b 1
 
-if defined CLEAN if exist "%BUILD_DIR%" rd /s /q "%BUILD_DIR%"
+if defined CLEAN (
+  set "ZP_CLEAN_BOARD=%BOARD%"
+  set "ZP_CLEAN_KIND=%APP_KIND%"
+  set "ZP_CLEAN_NAME=%APP_NAME%"
+  set "ZP_CLEAN_CFG=%CFG%"
+  call "%ZP_CMD%common.cmd" remove_build
+)
 if not exist "%BUILD_DIR%" mkdir "%BUILD_DIR%"
 
-set "CMAKE_ARGS=-b %BOARD% -d %BUILD_DIR% %APP_PATH% -- -DBOARD_ROOT=%ZPLATFORM_ROOT% -DZEPHYR_EXTRA_MODULES=%ZPLATFORM_ROOT%"
+rem CMake/DTS path args must use forward slashes (backslash escapes break DTC_OVERLAY_FILE).
+set "ROOT_FWD=%ZPLATFORM_ROOT:\=/%"
+set "BUILD_FWD=%BUILD_DIR:\=/%"
+set "APP_FWD=%APP_PATH:\=/%"
+
+set "CMAKE_ARGS=-b %BOARD% -d %BUILD_FWD% %APP_FWD% -- -DBOARD_ROOT=%ROOT_FWD% -DZEPHYR_EXTRA_MODULES=%ROOT_FWD%"
 if defined EXTRA set "CMAKE_ARGS=!CMAKE_ARGS! !EXTRA!"
 if defined MCUBOOT (
-  set "OVERLAY=%ZPLATFORM_ROOT%\boards\st\stm3210e_eval\stm3210e_eval_mcuboot.overlay"
-  set "CMAKE_ARGS=!CMAKE_ARGS! -DCONFIG_BOOTLOADER_MCUBOOT=y -DDTC_OVERLAY_FILE=!OVERLAY!"
+  set "OVERLAY=%ZPLATFORM_ROOT%\boards\st\%BOARD%\%BOARD%_mcuboot.overlay"
+  if not exist "!OVERLAY!" (
+    echo ERROR: MCUboot overlay not found for board %BOARD% 1>&2
+    exit /b 1
+  )
+  if not exist "%ZPLATFORM_ROOT%\keys\root-ec-p256.pem" (
+    echo ERROR: missing keys\root-ec-p256.pem - see keys\README.md 1>&2
+    exit /b 1
+  )
+  set "OVERLAY_FWD=!OVERLAY:\=/!"
+  set "CMAKE_ARGS=!CMAKE_ARGS! -DZPLATFORM_ROOT=%ROOT_FWD% -DCONFIG_BOOTLOADER_MCUBOOT=y -DCONFIG_STREAM_FLASH=y -DCONFIG_IMG_MANAGER=y -DCONFIG_MCUBOOT_IMG_MANAGER=y -DDTC_OVERLAY_FILE=!OVERLAY_FWD!"
+  if exist "%APP_PATH%\prj_mcuboot.conf" (
+    set "EXTRA_CONF_FWD=%APP_PATH:\=/%/prj_mcuboot.conf"
+    set "CMAKE_ARGS=!CMAKE_ARGS! -DEXTRA_CONF_FILE=!EXTRA_CONF_FWD!"
+  )
 )
 
 echo Executing: west build !CMAKE_ARGS!
@@ -96,7 +120,8 @@ if errorlevel 1 (
 )
 
 call "%ZP_CMD%common.cmd" write_last_build "%BOARD%" "%APP_NAME%" "%BUILD_DIR%" "%CFG%" "%APP_KIND%"
-"%ZPLATFORM_PY%" "%ZPLATFORM_ENV_PY%" --ensure --write-fingerprint "%BUILD_DIR%" --board "%BOARD%" --application "%APP_NAME%"
+"%ZPLATFORM_PY%" "%ZPLATFORM_ENV_PY%" --write-fingerprint "%BUILD_DIR%" --board "%BOARD%" --application "%APP_NAME%"
+"%ZPLATFORM_PY%" "%ZPLATFORM_ENV_PY%" --print-layout "%BUILD_DIR%"
 
 echo Build complete: %BUILD_DIR%
 exit /b 0
@@ -105,4 +130,7 @@ exit /b 0
 echo Usage:
 echo   scripts\cmd\build.cmd demo [--board BOARD] [--clean] [--debug^|--release] [--mcuboot]
 echo   scripts\cmd\build.cmd sample board_bringup [--board BOARD] ...
+echo.
+echo   --mcuboot   Link into MCUboot slot0 (see boards\...\stm3210e_eval_mcuboot.overlay^)
+echo   Partitions: boards\st\stm3210e_eval\stm3210e_eval.dts
 exit /b 1

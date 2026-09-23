@@ -13,7 +13,10 @@
 /dts-v1/;
 #include <st/f1/stm32f103Xg.dtsi>
 #include <st/f1/stm32f103z(f-g)tx-pinctrl.dtsi>
+#include <zephyr/dt-bindings/adc/adc.h>
+#include <zephyr/dt-bindings/display/panel.h>
 #include <zephyr/dt-bindings/input/input-event-codes.h>
+#include <zephyr/dt-bindings/pwm/pwm.h>
 
 / {
 	model = "STMicroelectronics STM3210E-EVAL board";
@@ -24,7 +27,37 @@
 		zephyr,shell-uart = &usart1;
 		zephyr,sram = &sram0;
 		zephyr,flash = &flash0;
-		/* zephyr,code-partition is set by MCUboot overlays only */
+		/* Standalone builds link into this single region (whole flash). */
+		zephyr,code-partition = &code_partition;
+		zephyr,display = &mb895_lcd;
+	};
+
+	/* RV1 pot + BNC analogs (UM0488 CN2/CN3/CN5 → PC1–PC3). */
+	zephyr,user {
+		io-channels = <&adc1 14>, <&adc1 11>, <&adc1 12>, <&adc1 13>;
+		dac = <&dac1>;
+		dac-channel-id = <1>;
+		dac-resolution = <12>;
+	};
+
+	/* MB895 TFT on CN16 — FSMC bank4 + Zephyr display API. */
+	mb895_lcd: mb895-lcd {
+		compatible = "zplatform,mb895-lcd";
+		/* 320×240 landscape — matches Cube HX8347D window (cols 0..319, rows 0..239). */
+		width = <320>;
+		height = <240>;
+		pixel-format = <PANEL_PIXEL_FORMAT_RGB_565>;
+		status = "okay";
+	};
+
+	/*
+	 * IS61WV51216BLL — 512K×16 on FSMC bank1 NOR/PSRAM3.
+	 * Access after zplatform_fsmc_sram_init() (CONFIG_ZPLATFORM_FSMC_SRAM).
+	 */
+	ext_sram: sram@68000000 {
+		compatible = "zephyr,memory-region", "mmio-sram";
+		reg = <0x68000000 DT_SIZE_K(1024)>;
+		zephyr,memory-region = "EXT_SRAM";
 	};
 
 	leds {
@@ -51,6 +84,16 @@
 		};
 	};
 
+	/* TIM1_CH1 (PA8) — exposed on CN10 / motor-control path; no on-board LED. */
+	pwmleds {
+		compatible = "pwm-leds";
+
+		pwm_led0: pwm_led_0 {
+			pwms = <&pwm1 1 PWM_MSEC(20) PWM_POLARITY_NORMAL>;
+			label = "TIM1_CH1 PA8";
+		};
+	};
+
 	gpio_keys {
 		compatible = "gpio-keys";
 
@@ -66,10 +109,42 @@
 			zephyr,code = <INPUT_KEY_1>;
 		};
 
+		/* JP4 open: Wakeup B2 (not USART2 CTS / motor-control) */
 		wakeup_button: button_wakeup {
 			label = "Wakeup";
 			gpios = <&gpioa 0 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
 			zephyr,code = <INPUT_KEY_WAKEUP>;
+		};
+
+		/* Joystick U19 — UM0455 / MB672 */
+		joy_up: button_joy_up {
+			label = "Joystick Up";
+			gpios = <&gpiog 15 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+			zephyr,code = <INPUT_KEY_UP>;
+		};
+
+		joy_down: button_joy_down {
+			label = "Joystick Down";
+			gpios = <&gpiod 3 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+			zephyr,code = <INPUT_KEY_DOWN>;
+		};
+
+		joy_left: button_joy_left {
+			label = "Joystick Left";
+			gpios = <&gpiog 14 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+			zephyr,code = <INPUT_KEY_LEFT>;
+		};
+
+		joy_right: button_joy_right {
+			label = "Joystick Right";
+			gpios = <&gpiog 13 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+			zephyr,code = <INPUT_KEY_RIGHT>;
+		};
+
+		joy_select: button_joy_select {
+			label = "Joystick Select";
+			gpios = <&gpiog 7 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+			zephyr,code = <INPUT_KEY_ENTER>;
 		};
 	};
 
@@ -78,10 +153,19 @@
 		led1 = &orange_led_2;
 		led2 = &red_led_3;
 		led3 = &blue_led_4;
+		pwm-led0 = &pwm_led0;
+		lcd0 = &mb895_lcd;
 		sw0 = &user_button;
 		sw1 = &tamper_button;
+		sw-wakeup = &wakeup_button;
+		joy-up = &joy_up;
+		joy-down = &joy_down;
+		joy-left = &joy_left;
+		joy-right = &joy_right;
+		joy-select = &joy_select;
 		watchdog0 = &iwdg;
 		die-temp0 = &die_temp;
+		rtc = &rtc;
 		mcuboot-button0 = &user_button;
 	};
 };
@@ -143,6 +227,19 @@
 	pinctrl-names = "default";
 	cs-gpios = <&gpiob 2 GPIO_ACTIVE_LOW>;
 	status = "okay";
+
+	/*
+	 * U6 M25P64-VME6G (64 Mbit). CS = PB2.
+	 * JP3 must route SPI1 MISO to the serial Flash (see UM0455).
+	 */
+	m25p64: m25p64@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <10000000>;
+		jedec-id = [20 20 17];
+		size = <DT_SIZE_M(64)>; /* 64 Mbit = 8 MiB */
+		status = "okay";
+	};
 };
 
 &iwdg {
@@ -163,6 +260,25 @@
 zephyr_udc0: &usb {
 	pinctrl-0 = <&usb_dm_pa11 &usb_dp_pa12>;
 	pinctrl-names = "default";
+	/*
+	 * USB FS shares IRQs 19/20 with bxCAN (RM0008). Default: USB live,
+	 * CAN disabled. samples/can (and demo overlay) flip that.
+	 */
+	status = "okay";
+};
+
+&can1 {
+	pinctrl-0 = <&can_rx_remap1_pb8 &can_tx_remap1_pb9>;
+	pinctrl-names = "default";
+	/* SN65HVD230 on CN4 — PB8/PB9 remap1 (UM0488 §2.7). */
+	status = "disabled";
+
+	can-transceiver {
+		max-bitrate = <1000000>;
+	};
+};
+
+&dac1 {
 	status = "okay";
 };
 
@@ -173,9 +289,50 @@ zephyr_udc0: &usb {
 };
 
 &adc1 {
-	pinctrl-0 = <&adc1_in1_pa1>;
+	/* RV1 PC4=IN14; BNC CN5/CN3/CN2 = PC1/PC2/PC3 = IN11/IN12/IN13 */
+	pinctrl-0 = <&adc1_in14_pc4 &adc1_in11_pc1 &adc1_in12_pc2
+		     &adc1_in13_pc3>;
 	pinctrl-names = "default";
 	status = "okay";
+
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	channel@e {
+		reg = <14>;
+		zephyr,gain = "ADC_GAIN_1";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+		zephyr,resolution = <12>;
+		zephyr,vref-mv = <3300>;
+	};
+
+	channel@b {
+		reg = <11>;
+		zephyr,gain = "ADC_GAIN_1";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+		zephyr,resolution = <12>;
+		zephyr,vref-mv = <3300>;
+	};
+
+	channel@c {
+		reg = <12>;
+		zephyr,gain = "ADC_GAIN_1";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+		zephyr,resolution = <12>;
+		zephyr,vref-mv = <3300>;
+	};
+
+	channel@d {
+		reg = <13>;
+		zephyr,gain = "ADC_GAIN_1";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+		zephyr,resolution = <12>;
+		zephyr,vref-mv = <3300>;
+	};
 };
 
 &die_temp {
@@ -189,34 +346,13 @@ zephyr_udc0: &usb {
 		#size-cells = <1>;
 
 		/*
-		 * Internal Flash layout for STM32F103ZGT6 (1024 KiB, 2 KiB erase).
-		 * Dual-slot MCUboot without scratch (swap-move / direct-xip capable).
-		 *
-		 * | Region   | Offset   | Size   | Purpose              |
-		 * |-----------|----------|--------|----------------------|
-		 * | MCUboot   | 0x00000  | 64 KiB | Bootloader           |
-		 * | Slot 0    | 0x10000  | 464 KiB| Primary application  |
-		 * | Slot 1    | 0x84000  | 464 KiB| Secondary / update   |
-		 * | Storage   | 0xF8000  | 32 KiB | Settings / NVS       |
+		 * Standalone / default image: one partition = entire Flash.
+		 * MCUboot builds replace this node via
+		 * support/partitions_mcuboot.dtsi (boot / slot0 / slot1 / storage).
 		 */
-		boot_partition: partition@0 {
-			label = "mcuboot";
-			reg = <0x00000000 DT_SIZE_K(64)>;
-		};
-
-		slot0_partition: partition@10000 {
-			label = "image-0";
-			reg = <0x00010000 DT_SIZE_K(464)>;
-		};
-
-		slot1_partition: partition@84000 {
-			label = "image-1";
-			reg = <0x00084000 DT_SIZE_K(464)>;
-		};
-
-		storage_partition: partition@f8000 {
-			label = "storage";
-			reg = <0x000f8000 DT_SIZE_K(32)>;
+		code_partition: partition@0 {
+			label = "code";
+			reg = <0x00000000 DT_SIZE_K(1024)>;
 		};
 	};
 };

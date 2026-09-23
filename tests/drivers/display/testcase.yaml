@@ -1,0 +1,12 @@
+tests:
+  zplatform.drivers.display:
+    tags:
+      - zplatform
+      - display
+      - drivers
+    filter: dt_chosen_enabled("zephyr,display")
+    platform_allow:
+      - stm3210e_eval
+    integration_platforms:
+      - stm3210e_eval
+    harness: ztest

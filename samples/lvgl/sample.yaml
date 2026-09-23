@@ -1,0 +1,13 @@
+sample:
+  name: ZPlatform LVGL splash
+tests:
+  sample.zplatform.lvgl:
+    tags: lvgl display
+    platform_allow:
+      - stm3210e_eval
+    harness: console
+    harness_config:
+      type: multi_line
+      regex:
+        - "\\[PASS\\] EXT_SRAM ready"
+        - "\\[PASS\\] LVGL splash"

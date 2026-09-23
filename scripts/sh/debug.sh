@@ -2,7 +2,7 @@
 # Copyright (c) 2026 ZPlatform contributors
 # SPDX-License-Identifier: Apache-2.0
 #
-# Start a debug session for the last built image (ST-Link → GDB).
+# Debug an existing build. Never rebuilds.
 
 set -euo pipefail
 
@@ -12,19 +12,41 @@ source "${SCRIPT_DIR}/common.sh"
 
 usage() {
 	cat <<EOF
-Usage: $0 [--board BOARD] [--runner openocd|jlink|...]
+Usage:
+  $0 [demo|sample <name>] [--board BOARD] [--config CFG] [--runner NAME]
 
-Uses west debug against the last successful build.
+  No app args: debug the last successful build.
 EOF
 }
 
+KIND=""
+NAME=""
 BOARD=""
+CONFIG=""
 RUNNER=""
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
+	demo)
+		KIND="demo"
+		NAME="demo"
+		shift
+		;;
+	sample)
+		KIND="sample"
+		NAME="${2:-}"
+		if [[ -z "${NAME}" || "${NAME}" == --* ]]; then
+			echo "error: sample name required" >&2
+			exit 1
+		fi
+		shift 2
+		;;
 	--board)
 		BOARD="$2"
+		shift 2
+		;;
+	--config)
+		CONFIG="$2"
 		shift 2
 		;;
 	--runner)
@@ -43,12 +65,26 @@ while [[ $# -gt 0 ]]; do
 done
 
 zplatform_setup_env
-zplatform_read_last_build
 
-BUILD_DIR="${build_dir}"
-BOARD="${BOARD:-${board}}"
+if [[ -n "${KIND}" ]]; then
+	BOARD="${BOARD:-${ZPLATFORM_DEFAULT_BOARD}}"
+	zplatform_resolve_app "${KIND}" "${NAME}" "${BOARD}"
+	zplatform_resolve_build_dir "${BOARD}" "${APP_KIND}" "${APP_NAME}" "${CONFIG}"
+else
+	zplatform_read_last_build
+	BOARD="${BOARD:-${board}}"
+	if [[ -n "${CONFIG}" && "${CONFIG}" != "${configuration}" ]]; then
+		zplatform_resolve_build_dir "${BOARD}" "${kind}" "${application}" "${CONFIG}"
+	else
+		BUILD_DIR="${build_dir}"
+		if [[ ! -d "${BUILD_DIR}/zephyr" ]]; then
+			echo "error: last build missing at ${BUILD_DIR}" >&2
+			exit 1
+		fi
+	fi
+fi
+
 ELF="${BUILD_DIR}/zephyr/zephyr.elf"
-
 if [[ ! -f "${ELF}" ]]; then
 	echo "error: ELF not found: ${ELF}" >&2
 	exit 1
@@ -60,16 +96,4 @@ if [[ -n "${RUNNER}" ]]; then
 fi
 
 echo "Debugging ${ELF}"
-echo "Executing: west debug ${ARGS[*]}"
-echo
-echo "Useful GDB commands once attached:"
-echo "  break main"
-echo "  continue"
-echo "  stepi / next / finish"
-echo "  info registers"
-echo "  bt"
-echo "  info threads"
-echo "  monitor reset halt"
-echo
-
 zplatform_west debug "${ARGS[@]}"

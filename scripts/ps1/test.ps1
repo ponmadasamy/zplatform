@@ -25,6 +25,20 @@ $testRoot = Join-Path $root "tests"
 if ($Focus) { $testRoot = Join-Path $testRoot $Focus }
 if (-not (Test-Path $testRoot)) { throw "test path not found: $testRoot" }
 
+# Twister uses os.path.relpath against ZEPHYR_BASE; that fails when the
+# repo and west workspace are on different Windows drives (E: vs C:).
+$ws = $env:ZPLATFORM_WEST_WORKSPACE
+if ($ws -and (Split-Path -Qualifier $root) -ne (Split-Path -Qualifier $ws)) {
+    Write-Host @"
+error: twister cannot load tests across Windows drives.
+  repo      : $root
+  workspace : $ws
+Clone/link zplatform onto the same drive as the west workspace, or set
+ZPLATFORM_WEST_WORKSPACE to a workspace on $((Split-Path -Qualifier $root)).
+"@
+    exit 1
+}
+
 $outdir = Join-Path $root "build\twister"
 New-Item -ItemType Directory -Force -Path $outdir | Out-Null
 

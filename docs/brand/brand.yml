@@ -1,0 +1,66 @@
+# ZPlatform brand kit
+#
+# Machine-readable copy + colors for docs, demos, and tooling.
+# Visual assets: assets/ (hand-curated from the master brand board).
+
+name: ZPlatform
+tagline: "BUILD · CONNECT · EMPOWER"
+vision: "Embedded for a Brighter Tomorrow"
+impact: "Small Steps. Real Impact."
+positioning: "Zephyr-powered embedded solutions"
+quote:
+  text: "Technology is more meaningful when it empowers people."
+  attribution: Ponmadasamy
+
+pillars:
+  - Ideas
+  - Hardware
+  - Software
+  - People
+  - A Brighter Tomorrow
+
+capabilities:
+  - MCU Bring-up
+  - Samples & Demos
+  - Secure (MCUboot)
+  - Test & Profile
+  - Multiple Boards
+
+descriptors:
+  - Open
+  - Modular
+  - Multi-Board
+  - Real-World
+  - Zephyr-Powered
+
+# Use these hex values whenever UI/docs need brand colors (no palette image).
+colors:
+  midnight: { hex: "#0B1220", meaning: "Stability, Focus" }
+  azure:    { hex: "#2563EB", meaning: "Technology, Trust" }
+  cyan:     { hex: "#06B6D4", meaning: "Clarity, Innovation" }
+  purple:   { hex: "#8B5CF6", meaning: "Creativity, Modern" }
+  amber:    { hex: "#F59E0B", meaning: "Energy, Progress" }
+  snow:     { hex: "#F8FAFC", meaning: "Clean, Minimal" }
+
+assets:
+  logo_lockup: assets/logo-lockup.png
+  logo_mark: assets/logo-mark.png
+  icon: assets/icon.png
+  # Temporary: same art as logo until dedicated light/dark/mono variants exist.
+  icon_on_light: assets/icon-on-light.png
+  icon_on_dark: assets/icon-on-dark.png
+  icon_mono: assets/icon-mono.png
+  icon_social: assets/icon-social.png
+  icons_sheet: assets/icons-app-favicon.png
+  all_icons: assets/all-icon.png
+  hero_banner: assets/hero-banner.png
+  banner_circuit: assets/banner-circuit.png
+  evk_lcd_demo: assets/evk-lcd-demo.png
+  brand_board_full: assets/brand-board-full.png
+
+# Console / LCD status labels used by demos (match EVK mock)
+demo_status:
+  - System
+  - Sensors
+  - Connectivity
+  - Storage

@@ -27,3 +27,4 @@ manifest:
           - segger
           - net-tools
           - zcbor
+          - lvgl

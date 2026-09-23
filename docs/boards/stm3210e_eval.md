@@ -37,27 +37,165 @@ ZPlatform therefore ships **out-of-tree** board support under
 - `SOC_STM32F103XE` Kconfig
 - OpenOCD / CubeProgrammer / J-Link runners via Zephyr board.cmake helpers
 
-## Peripherals described in DeviceTree
+## EVK peripherals inventory (samples preparation)
 
-| Function | Wiring | Notes |
-|----------|--------|-------|
-| Console UART | USART1 PA9/PA10 | RS-232 on CN12 |
-| LEDs LD1–LD4 | PF6–PF9 | Active high |
-| User Key | PG8 | `sw0` |
-| Tamper | PC13 | |
-| Wakeup | PA0 | Shares EXTI0 |
-| I2C1 | PB6/PB7 | STLM75 @ 0x48 |
-| SPI1 | PA5/PA6/PA7, CS PB2 | SPI NOR footprint |
-| USB FS | PA11/PA12 | Device |
-| ADC1 | PA1 (IN1) | |
-| PWM | TIM1_CH1 PA8 | |
-| RTC | LSI | |
-| IWDG | on-chip | |
-| Ethernet | — | **Not present** on STM32F103 |
+What is **on the STM3210E-EVAL (MB672)** hardware, with part numbers where the
+manual / schematic / Cube BSP name them, and how Zephyr covers that class of
+device today. Use this when planning shared samples — not a project status list.
 
-FSMC memories (NOR/NAND/SRAM), LCD, audio codec, CAN, SDIO, and joystick
-are present on the PCB but not all are enabled in the initial DT. Add them
-incrementally with verified pinmux.
+**Sources:** [UM0455](https://www.st.com/resource/en/user_manual/cd00178166.pdf),
+MB672-F103ZGT6 schematic (Rev D-06), MB895 LCD module schematic,
+[stm3210e-eval-bsp](https://github.com/STMicroelectronics/stm3210e-eval-bsp)
+(+ components `stlm75`, `ak4343`, `hx8347d`, `ili9320`, `spfd5408`),
+[product page](https://www.st.com/en/evaluation-tools/stm3210e-eval.html).
+
+**MCU:** STM32F103**ZG**T6 (1 MiB / 96 KiB) on current boards; MB672 ≤ D-03 may
+ship STM32F103**ZE**T6 (512 KiB / 64 KiB). Package TQFP-144.
+
+### MCU, power, debug
+
+| Feature | Part / interface | Description | Zephyr support |
+|---------|------------------|-------------|----------------|
+| Application MCU | STM32F103ZGT6 (or ZET6) | Cortex-M3 @ 72 MHz, FSMC, USB FS, CAN, SDIO, I2S, … | Full STM32F1 SoC support (`soc/st/stm32`, F1 series) |
+| HSE | 8 MHz crystal | Main clock source for PLL → 72 MHz | Clock DT (`clk_hse` / `pll` / `rcc`) |
+| Power | 5 V via CN17 jack, CN14 USB, or daughterboard; LD5 = power OK | Board-level supply (probe does not power target) | N/A (hardware) |
+| VBAT / RTC backup | **CR1220** coin cell + JP1 | Keeps RTC when main power off | `rtc` on STM32; battery is board wiring |
+| JTAG / SWD | CN9 ARM 20-pin (primary); CN7 CoreSight SWD+Trace | No on-board ST-Link — external probe | Runners: CubeProgrammer, OpenOCD, J-Link |
+| Boot mode | BOOT0 / BOOT1 switches | User Flash / SRAM / system memory | N/A (hardware) |
+
+### Human interface
+
+| Feature | Part / interface | Description | Zephyr support |
+|---------|------------------|-------------|----------------|
+| User LEDs | LD1–LD4 on **PF6–PF9** (active high) | Four colour LEDs. Sample `gpio` (EVK): LD1 heartbeat, LD2 cpu, LD3 timer, LD4 panic (rotatable) | `gpio-leds` + `ZPLATFORM_LED_TRIGGERS` |
+| Power LED | LD5 | Lit when board powered | N/A (hardware indicator) |
+| User Key | B4 on **PG8** | General-purpose button; sample: pause/resume LED patterns | `gpio-keys` / input |
+| Tamper | B3 on **PC13** | Tamper button; sample: enter STANDBY | `gpio-keys` / input |
+| Wakeup | B2 on **PA0** | WKUP pin; mux with USART2 CTS (**JP4 open**); sample: wake from STANDBY = full reset/boot | `gpio-keys` / input |
+| Reset | NRST | System reset | Hardware / probe NRST |
+| Joystick | U19 — select **PG7**, up **PG15**, down **PD3**, left **PG14**, right **PG13** | 4-direction + select; sample: U/D timer, L/R rotate triggers | `gpio-keys` |
+
+### Serial, USB, CAN, IrDA
+
+| Feature | Part / interface | Description | Zephyr support |
+|---------|------------------|-------------|----------------|
+| USART1 + RS-232 | **U7** **ST3232ECTR** → **CN12** DB9; MCU **PA9/PA10** | Primary console UART @ 115200 typical | `uart` / console / shell |
+| USART2 + RS-232 | **U5** **ST3232ECTR** → **CN8** DB9; TX/RX/RTS/CTS on PA2/PA3/PA1/PA0; JP4 | Second async channel with handshake | `uart` (STM32 USART2) |
+| USB FS device | MCU USB on **PA11/PA12** → **CN14** Type-B | USB 2.0 full-speed device | `usb_dc_stm32` + class stacks (CDC, MSC, …) |
+| CAN | **SN65HVD230** → **CN4** DB9; RX/TX **PB8/PB9**; JP6/JP8 | CAN 2.0A/B, 3.3 V PHY (standby / high-speed / slope) | `can_stm32` (bxCAN) + DT `can-transceiver` |
+| IrDA | **TFDU4301-TR3** (U13; UM family TFDU4300) on **USART3** PC10/PC11; JP21/JP22 | SIR IrDA; RX mux with microSD D3 | `uart` IrDA mode (PHY transparent) |
+
+### Sensors and analog
+
+| Feature | Part / interface | Description | Zephyr support |
+|---------|------------------|-------------|----------------|
+| Board temperature | **STLM75M2F** (U9) on I2C1 **PB6/PB7**, addr **0x48**; OS/INT **PB5** (JP11) | −55 °C … +125 °C, SMBus/I2C | `lm75` (`compatible = "lm75"`) |
+| Potentiometer | **RV1** → **PC4** (ADC) | Analog user control | `adc` (STM32 ADC) |
+| Analog BNC inputs | **CN2/CN3/CN5** → **PC3/PC2/PC1**; 50 Ω JP23–25; LPF footprints | External analog inputs | `adc` |
+| On-die temperature | STM32 internal sensor | Package temperature via ADC | `st,stm32-temp` |
+| DAC | MCU DAC1/DAC2 (also wired toward audio path) | On-chip DACs | `dac` (STM32) |
+
+### Storage
+
+| Feature | Part / interface | Description | Zephyr support |
+|---------|------------------|-------------|----------------|
+| SPI serial Flash | **M25P64-VME6G** (U6); UM allows 64 **or** 128 Mbit; CS **PB2**, SPI1 PA5/PA6/PA7; JP3 MISO mux | JEDEC SPI NOR | `jedec,spi-nor` + STM32 SPI |
+| FSMC SRAM | **IS61WV51216BLL-10MLI** — 512K×16; FSMC bank1 NOR/PSRAM3 | External async SRAM | OOT `ZPLATFORM_FSMC_SRAM` + `ext_sram` DT @ 0x68000000 |
+| FSMC NOR Flash | U2 one of: **M29W128GL70ZA6E**, **M29W128GH70ZA6E**, **S29GL128P90FFIR20** (128 Mbit); JP5 WP | Parallel NOR, FSMC bank1 NOR/PSRAM2 — **read U2 marking** | `memc_stm32` + flash/MTD (board DT) |
+| FSMC NAND Flash | **NAND512W3A2CN6E** / **NAND512W3A2BN6E** (schematic); UM 512 Mbit×8 **or** 1 Gbit×8; FSMC bank2; JP7 R/B | Parallel NAND | STM32 FMC/FSMC NAND + Zephyr NAND/MTD (board DT) |
+| microSD | SDIO → **CN13**; detect **PF11**; UM cites 128 Mbyte (or larger); JP17 fitted, JP20/JP22 open | SD memory card | OOT `ZPLATFORM_SDIO_SD` (HAL_SD 1-bit bring-up) |
+
+### Display and audio
+
+| Feature | Part / interface | Description | Zephyr support |
+|---------|------------------|-------------|----------------|
+| TFT colour LCD | **MB895** on **CN16**, 320×240 (Cube landscape / HX8347D MAC 0xE0), FSMC bank1 NOR/PSRAM4 | Controller is one of ST BSP set: **HX8347D**, **ILI9320**, or **SPFD5408** (runtime ID) | OOT `zplatform,mb895-lcd` Zephyr `display` driver |
+| Optional graphic LCD | **U18** footprint **HXM122032-GB1** 122×32 (default **not fitted**) | Second LCD option | N/A unless populated |
+| Audio DAC + jack | **AK4343** on I2S (+ MCU DAC); PDN **PG11**; **CN15** 3.5 mm; JP15/JP18 | Stereo audio out | `i2s_stm32` data path; no in-tree `ak4343` codec (ST BSP `stm32-ak4343`) |
+
+### Smartcard, motor control, expansion
+
+| Feature | Part / interface | Description | Zephyr support |
+|---------|------------------|-------------|----------------|
+| Smartcard | **ST8024CDR** + **CN18**; async 3 V / 5 V; mux JP15/JP16 | ISO7816-class interface | No ST8024 driver; UART ISO7816 + GPIOs possible |
+| Motor-control connector | **CN1** inductor-motor header | BLDC/PMSM drive signals; mux with SD / I2S / smartcard / JTAG | PWM/ADC/GPIO + external inverter |
+| Extension headers | **CN10** / **CN11** PIO + FSMC | Daughterboard / wrap | DT / pinctrl |
+
+### Multiplexing note
+
+Several features share MCU pins (microSD ↔ IrDA ↔ motor-control ↔ smartcard ↔
+I2S_MCK ↔ JTAG). UM0455 jumper tables (JP3, JP4, JP15–JP22, …) define which
+function is live. Sample DT must document the jumper set it assumes.
+
+## Samples preparation checklist
+
+Track enablement against the inventory above. **Done** = in DTS and exercised
+by a sample and/or `demo/stm3210e_eval`. **Partial** = DT (or bus) only, or
+smoke/ready-check only. **Todo** = on the EVK, not in DTS / no sample yet.
+
+| # | Feature | DT | Sample / demo | Status |
+|---|---------|----|---------------|--------|
+| 1 | SWD / JTAG (CN9) | runners | flash/debug scripts | **Done** |
+| 2 | USART1 console (CN12) | `usart1` | `board_bringup`, demo, shell | **Done** |
+| 3 | LEDs LD1–LD4 | `gpio-leds` | `samples/gpio` triggers (HB/CPU/TIM/PAN); rotatable | **Done** |
+| 4 | User Key (B4) | `sw0` | `samples/gpio` pause/resume | **Done** |
+| 5 | Tamper (B3) | `sw1` | `samples/gpio` → STANDBY | **Done** |
+| 6 | Wakeup (B2) | `sw-wakeup` | `samples/gpio` WKUP → reset/boot | **Done** |
+| 7 | Joystick (U19) | joy-* aliases | `samples/gpio` timer + rotate | **Done** |
+| 8 | STLM75M2F temp | `stlm75` / `lm75` | `sensor`, demo | **Done** |
+| 9 | Die temperature | `die_temp` | demo live + sensor | **Done** |
+| 10 | SPI1 bus | `spi1` + CS PB2 | demo bus-ready | **Done** |
+| 11 | SPI NOR M25P64 | `m25p64` / `jedec,spi-nor` | `samples/spi_flash`, demo JEDEC | **Done** |
+| 12 | ADC1 | `adc1` + IN11–14 | `samples/adc` (RV1), BNC DT | **Done** |
+| 13 | RV1 potentiometer (PC4) | `adc1_in14_pc4` / `zephyr,user` | `samples/adc`, demo | **Done** |
+| 14 | BNC analog (PC1–PC3) | ADC IN11–13 in DT | DT ready (probe via adc) | **Partial** |
+| 15 | PWM TIM1_CH1 (PA8) | `pwm1` + `pwm-led0` | `samples/pwm`, demo set | **Done** |
+| 16 | RTC (+ CR1220) | `rtc` (F1 = counter) | `samples/rtc`, demo ticks | **Done** |
+| 17 | IWDG | `iwdg` | DT / alias | **Partial** |
+| 18 | USB FS (CN14) | `usb` okay | `samples/usb_cdc` (CAN off) | **Done** |
+| 19 | USART2 (CN8) | node disabled | — | **Todo** (JP4 mux) |
+| 20 | IrDA TFDU4301 (USART3) | — | — | **Todo** (mux SD) |
+| 21 | CAN SN65HVD230 (CN4) | `can1` + overlay | `samples/can` loopback, demo | **Done** |
+| 22 | FSMC SRAM | `ext_sram` @ 0x68000000 | `samples/ext_sram` | **Done** |
+| 23 | FSMC NOR Flash | — | — | **Todo** |
+| 24 | FSMC NAND Flash | — | — | **Todo** (no driver yet) |
+| 25 | microSD (CN13) | SDIO + `ZPLATFORM_SDIO_SD` | `samples/microsd` | **Done** |
+| 26 | TFT LCD MB895 (CN16) | `zephyr,display` + `mb895-lcd` | `samples/lcd` display API | **Done** |
+| 27 | Audio AK4343 (CN15) | — | — | **Todo** (no codec driver) |
+| 28 | Smartcard ST8024 (CN18) | — | — | **Todo** |
+| 29 | DAC channels | `dac1` + `zephyr,user` | `samples/dac` (PA4 CH1), demo | **Done** |
+| 30 | Motor-control (CN1) | — | — | **Todo** |
+| 31 | Extension CN10/CN11 | as needed | — | **Todo** |
+
+### Repo samples (status)
+
+| App | Purpose | Status |
+|-----|---------|--------|
+| `samples/board_bringup` | LED + button + console smoke | **Done** |
+| `samples/gpio` | EVK: LED triggers + sleep/wake/joystick; else led0/sw0 | **Done** |
+| `samples/sensor` | STLM75 ambient temp | **Done** |
+| `samples/spi_flash` | M25P64 JEDEC ID + read (JP3) | **Done** |
+| `samples/adc` | RV1 pot on ADC1_IN14 (PC4) | **Done** |
+| `samples/pwm` | TIM1_CH1 PA8 duty (CN10 / scope) | **Done** |
+| `samples/lcd` | MB895 via Zephyr `display` API (CN16) | **Done** |
+| `samples/ext_sram` | FSMC bank3 IS61WV51216 selftest | **Done** |
+| `samples/microsd` | SDIO CN13 detect + R/W | **Done** |
+| `samples/lvgl` | Brand splash on MB895 (VDB in EXT_SRAM) | **Done** |
+| `samples/rtc` | RTC set/get (LSI / X2) | **Done** |
+| `samples/dac` | DAC1 CH1 PA4 sawtooth | **Done** |
+| `samples/can` | bxCAN loopback (USB off — IRQ share) | **Done** |
+| `samples/usb_cdc` | USB FS CDC ACM on CN14 | **Done** |
+| `demo/stm3210e_eval` | Console smoke + LVGL UI (live peri/threads) | **Done** |
+| `tests/platform/smoke` | Ztest smoke | **Done** (on-device) |
+| `tests/drivers/display` | MB895 `display` API (write/blanking/ID) | **Done** (on-device) |
+
+### Suggested next (planning)
+
+1. FatFS / Zephyr `disk` on SDIO once product needs filesystem.
+2. FSMC NOR / **NAND512W3A** (not supported yet — Todo).
+3. Audio AK4343 / Smartcard / IrDA when product demos need them (jumper mux).
+4. IWDG deeper sample; USART2 with JP4.
+5. Touch / richer LVGL widgets on the EVK UI.
 
 ## Hardware connection (STLINK-V3MINI)
 
@@ -199,22 +337,8 @@ Optional: if VCP still shows no traffic with SWD connected, confirm CN9 pin 1 (3
 ### Flash / debug after cabling
 
 Default runner: **STM32CubeProgrammer** (flash). OpenOCD remains the debug runner.
-
-```bash
-./scripts/sh/build.sh sample board_bringup --board stm3210e_eval
-./scripts/sh/flash.sh
-./scripts/sh/debug.sh
-```
-
-Windows:
-
-```powershell
-.\scripts\ps1\build.ps1 sample board_bringup
-.\scripts\ps1\flash.ps1
-.\scripts\ps1\debug.ps1
-```
-
-Override flasher if needed: `.\scripts\ps1\flash.ps1 -Runner openocd`
+Commands: [`scripts/README.md`](../../scripts/README.md) (`build` / `flash` / `debug`).
+Override flasher: `flash … -Runner openocd` / `--runner openocd`.
 
 #### JTAG vs SWD on CN9
 
@@ -234,27 +358,46 @@ west flash -r openocd --config boards/st/stm3210e_eval/support/openocd-jtag.cfg
 ```
 ## Build
 
-```bash
-./scripts/sh/build.sh sample board_bringup --board stm3210e_eval
-./scripts/sh/build.sh demo --board stm3210e_eval
+Commands and flag combinations: [`scripts/README.md`](../../scripts/README.md).
+
+The demo lives at `demo/stm3210e_eval/` (selected from `-Board` / `--board`).
+Board `*_defconfig` is bring-up only; SHELL / I2C / SENSOR and other showcase
+options are in the demo `prj.conf`.
+
+Artifacts (isolated per kind/config):
+
+```text
+build/stm3210e_eval/demo/default/
+build/stm3210e_eval/demo/mcuboot/
+build/stm3210e_eval/sample/board_bringup/default/
+build/stm3210e_eval/sample/gpio/default/
+build/stm3210e_eval/sample/sensor/default/
 ```
 
-Artifacts: `build/stm3210e_eval/<app>/<cfg>/zephyr/zephyr.{elf,bin,hex,map}`
+Flash/debug never rebuild; pass `-Config` / `--config` to pick a tree.
+
+**default vs `-Mcuboot`:** standalone builds use a single DTS `code_partition`
+(whole 1 MiB) as `zephyr,code-partition`. `-Mcuboot` applies
+`support/partitions_mcuboot.dtsi` (replaces that node with boot/slot0/slot1/storage)
+plus `stm3210e_eval_mcuboot.overlay` so the app links into slot0. After every
+build, `--print-layout` shows the active map and marks `<- THIS IMAGE`.
 
 ## MCUboot memory layout (ZGT6, 1024 KiB)
 
 Erase size: **2 KiB**.
 
-| Region | Offset | Size | Purpose |
-|--------|--------|------|---------|
-| MCUboot | `0x00000` | 64 KiB | Bootloader |
-| Slot 0 | `0x10000` | 464 KiB | Primary image |
-| Slot 1 | `0x84000` | 464 KiB | Update image |
-| Storage | `0xF8000` | 32 KiB | Settings / NVS |
+| Region | Offset | Size | Bank | Purpose |
+|--------|--------|------|------|---------|
+| MCUboot | `0x00000` | 64 KiB | 1 | Bootloader |
+| Slot 1 | `0x10000` | 448 KiB | 1 | Update image (secondary) |
+| Slot 0 | `0x80000` | 448 KiB | 2 | Primary image (runs here) |
+| Storage | `0xF0000` | 64 KiB | 2 | Settings / NVS |
 
-Absolute Flash base: `0x08000000`.
+Absolute Flash base: `0x08000000`. Primary is in **bank 2** so MCUboot
+(executing in bank 1) can erase/program it without hanging the CPU
+(STM32F1 cannot fetch code from a bank that is being programmed).
 
-Swap mode: `CONFIG_BOOT_SWAP_USING_MOVE=y` (no scratch partition).
+Upgrade mode: `CONFIG_BOOT_UPGRADE_ONLY=y` (overwrite slot1 → slot0).
 
 Signature: **ECDSA-P256** + TinyCrypt (RSA/mbedTLS does not fit the
 64 KiB boot slot). Development key: `keys/root-ec-p256.pem` (not
@@ -265,40 +408,32 @@ Flash addresses (CubeProgrammer):
 | Image | Address |
 |-------|---------|
 | MCUboot | `0x08000000` |
-| Signed slot 0 | `0x08010000` |
+| Signed slot 0 (primary) | `0x08080000` |
+| Signed slot 1 (upgrade) | `0x08010000` |
 
 ```powershell
-.\scripts\ps1\build.ps1 demo -Board stm3210e_eval -Mcuboot
-# then imgtool-sign zephyr.bin → zephyr.signed.bin (slot-size 0x74000)
+# Build/sign (+ optional flash and slot1 upgrade) — see scripts/README.md
+.\scripts\ps1\mcuboot_demo.ps1 -Flash -Upgrade
 ```
 
-See `support/mcuboot.conf`, `stm3210e_eval_mcuboot.overlay`, and
-`./scripts/sh/mcuboot_demo.sh`.
+Scripts pass `-DZPLATFORM_ROOT=<repo>` so the ECDSA key path in
+`support/mcuboot.conf` stays portable. See `stm3210e_eval_mcuboot.overlay`.
 
-## Profiling
+## Profiling / Ztest
 
-```bash
-./scripts/sh/profile.sh demo --board stm3210e_eval
-```
-
-Uses DWT CYCCNT (Cortex-M3), thread runtime stats, and stack watermarks.
-SystemView is optional and not enabled by default.
-
-## Ztest
-
-```bash
-./scripts/sh/test.sh
-./scripts/sh/test.sh platform/smoke
-```
-
-Default script mode is **build-only** for `stm3210e_eval` (no claim of
-hardware pass). Use Twister device testing when hardware is attached.
+Use `profile` / `test` from [`scripts/README.md`](../../scripts/README.md).
+Profiling uses DWT CYCCNT, thread runtime stats, and stack watermarks.
+Twister default mode is **build-only** for this board.
 
 ## Known limitations
 
-- Older MB672 boards with ZET6 (DEV_ID `0x414`, 512 KiB) would need a DT/memory variant — this lab board is ZGT6.
-- External memories / LCD / audio / CAN / SDIO not enabled initially.
-- Ethernet unavailable on this MCU.
+- Older MB672 boards with ZET6 (DEV_ID `0x414`, 512 KiB) need a DT/memory variant — this lab board is ZGT6.
+- NOR Flash U2 and NAND density/controller marking can vary by build; identify the part on the PCB before writing flash samples.
+- Many connectors share pins — see **Multiplexing note** in the EVK inventory.
+- MCUboot **slot1 upgrade** (`mcuboot_demo -Upgrade`) is still unreliable on this
+  dual-bank F103 layout (programming/erase interaction). `mcuboot_demo -Flash`
+  (boot + signed v1 in slot0 @ bank2) is verified; treat `-Upgrade` as WIP.
+- Progress on DT/samples: **Samples preparation checklist**.
 - Hardware bring-up: STLINK-V3MINI (+ adapter) on **CN9**, board powered separately.
 
 ## Hardware validation
@@ -313,9 +448,10 @@ JTAG connect/flash: PASS
 COM3 VCP          : PASS after TX/RX swap on CN10 @ 115200
 board_bringup     : PASS (LED, BUTTON, Console)
 platform smoke    : PASS (3/3 ztest on-device)
-zplatform_demo    : PASS (peripherals + shell `zplatform info`)
-MCUboot + signed  : PASS (v2.4.0 → slot0 v1.0.0 → demo banner)
-                  : bootloader ~28 KiB / 64 KiB; ECDSA-P256
+demo/stm3210e_eval : PASS (peripherals + shell `zplatform info`)
+MCUboot + signed  : PASS (v2.4.0 → slot0; ECDSA-P256; confirm in demo)
+MCUboot upgrade   : PASS swap-move (slot1→slot0); pad+bank-aligned slots
+                  : verified slot0 image header iv_major=2 after upgrade
 ```
 
 Correct VCP wiring (confirmed on hardware):

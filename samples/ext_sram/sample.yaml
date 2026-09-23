@@ -1,0 +1,13 @@
+sample:
+  name: ZPlatform FSMC external SRAM
+tests:
+  sample.zplatform.ext_sram:
+    tags: sram fsmc
+    platform_allow:
+      - stm3210e_eval
+    harness: console
+    harness_config:
+      type: multi_line
+      regex:
+        - "\\[PASS\\] FSMC SRAM init"
+        - "\\[PASS\\] FSMC SRAM selftest"

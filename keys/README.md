@@ -15,10 +15,15 @@ imgtool getpub -k keys/root-ec-p256.pem > keys/root-ec-p256.pem.pub
 
 `imgtool` is provided by MCUboot (`bootloader/mcuboot/scripts` or `pip install imgtool`).
 
-Point MCUboot at the key via `CONFIG_BOOT_SIGNATURE_KEY_FILE` in
-`boards/st/stm3210e_eval/support/mcuboot.conf` (absolute path is
-recommended on Windows when the west workspace and ZPlatform live on
-different drives).
+MCUboot resolves the key via `CONFIG_BOOT_SIGNATURE_KEY_FILE` in
+`boards/st/stm3210e_eval/support/mcuboot.conf`:
+
+```text
+CONFIG_BOOT_SIGNATURE_KEY_FILE="${ZPLATFORM_ROOT}/keys/root-ec-p256.pem"
+```
+
+Build scripts pass `-DZPLATFORM_ROOT=<repo>` (forward slashes) so the path
+is portable across machines and Windows drive letters.
 
 ## Optional RSA-2048 (larger boards)
 

@@ -7,6 +7,7 @@ tests:
       - stm3210e_eval
     harness: console
     harness_config:
-      type: one_line
+      type: multi_line
       regex:
         - "Sensor sample"
+        - "\\[PASS\\] Sensor device ready"

@@ -1,4 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
+#
+# Minimal board bring-up only. Demo/sample feature lists (SHELL, SENSOR, …)
+# belong in demo/<board>/prj.conf or samples/<name>/prj.conf — not here.
 
 CONFIG_SERIAL=y
 CONFIG_CONSOLE=y

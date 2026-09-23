@@ -1,8 +1,20 @@
 # ZPlatform
 
+<p align="center">
+  <img src="docs/brand/assets/logo-lockup.png" alt="ZPlatform" width="320"/>
+</p>
+
+<p align="center">
+  <strong>BUILD · CONNECT · EMPOWER</strong><br/>
+  <em>Embedded for a Brighter Tomorrow</em> · <em>Small Steps. Real Impact.</em>
+</p>
+
 ZPlatform is a scalable, modular platform layer for **Zephyr RTOS**. It hosts
 STM32 evaluation kits, custom boards, out-of-tree drivers, middleware, and
 platform services without restructuring the repository.
+
+Brand kit (colors, slogans, icons, banners):
+[`docs/brand/README.md`](docs/brand/README.md).
 
 ## Zephyr version
 
@@ -15,27 +27,8 @@ platform services without restructuring the repository.
 | SDK | **≥ 1.0.0** |
 | Python | **≥ 3.12** |
 
-Do not edit `west.yml` revision independently — run
-`./scripts/sh/setup-zephyr.sh --sync-manifest` (or the `ps1` equivalent).
-
-## Environment manager
-
-```bash
-./scripts/sh/setup-zephyr.sh --status
-./scripts/sh/setup-zephyr.sh --check-latest
-```
-
-```powershell
-.\scripts\ps1\setup-zephyr.ps1 -Status
-.\scripts\ps1\setup-zephyr.ps1 -CheckLatest
-```
-
-Scripts live under `scripts/sh/`, `scripts/ps1/`, and `scripts/cmd/`. See
-[scripts/README.md](scripts/README.md) and [docs/environment.md](docs/environment.md).
-
-**Does not uninstall** existing SDK installs (e.g. `zephyr-sdk-0.17.4`).
-Default west workspace is `~/zephyrproject` (Zephyr getting-started path);
-override with `ZPLATFORM_WEST_WORKSPACE` if needed.
+Do not edit `west.yml` revision independently — sync via
+[`scripts/README.md`](scripts/README.md) (`setup-zephyr` `--sync-manifest`).
 
 ## First hardware target
 
@@ -48,33 +41,47 @@ override with `ZPLATFORM_WEST_WORKSPACE` if needed.
 
 ## Quick start
 
-```bash
-git clone git@github.com:ponmadasamy/zplatform.git
-cd zplatform
-./scripts/sh/build.sh demo --board stm3210e_eval
-```
-
 ```powershell
 .\scripts\ps1\build.ps1 demo -Board stm3210e_eval
 ```
 
-If PowerShell scripts are blocked (`ExecutionPolicy`), use cmd instead:
+```bash
+./scripts/sh/build.sh demo --board stm3210e_eval
+```
 
 ```bat
 scripts\cmd\build.cmd demo --board stm3210e_eval
 ```
 
-The build script bootstraps Python `.venv`, west workspace, Zephyr **v4.4.2**,
-and a compatible SDK automatically. No manual Zephyr install is required.
+Build bootstraps `.venv`, west workspace, Zephyr **v4.4.2**, and a compatible
+SDK. **All scripts, flags, and shell combinations:**
+[`scripts/README.md`](scripts/README.md). Environment details:
+[`docs/environment.md`](docs/environment.md).
 
-### Flash / debug / test
+## STM3210E-EVAL
 
-```bash
-./scripts/sh/flash.sh
-./scripts/sh/debug.sh
-./scripts/sh/profile.sh
-./scripts/sh/test.sh
-```
+Default board `stm3210e_eval`. Outputs:
+`build/stm3210e_eval/{demo,sample,boot}/.../<config>/`.
+
+| Config | Linker / flash |
+|--------|----------------|
+| `default` / `debug` / `release` / `profile` | Single DTS `code_partition` = whole 1 MiB @ `0x08000000` |
+| `mcuboot` | Slot0 link + signed `zephyr.signed.bin` |
+
+Every build has one `zephyr,code-partition` (marked `<- THIS IMAGE` in the
+post-build layout print). Standalone and MCUboot maps are different DTS views.
+
+| File | Role |
+|------|------|
+| [`boards/st/stm3210e_eval/stm3210e_eval.dts`](boards/st/stm3210e_eval/stm3210e_eval.dts) | Standalone `code_partition` |
+| [`boards/st/stm3210e_eval/support/partitions_mcuboot.dtsi`](boards/st/stm3210e_eval/support/partitions_mcuboot.dtsi) | MCUboot: boot / slot0 / slot1 / storage |
+| [`boards/st/stm3210e_eval/stm3210e_eval_mcuboot.overlay`](boards/st/stm3210e_eval/stm3210e_eval_mcuboot.overlay) | App → `&slot0_partition` |
+| [`boards/st/stm3210e_eval/support/mcuboot.overlay`](boards/st/stm3210e_eval/support/mcuboot.overlay) | Bootloader → `&boot_partition` |
+| [`boards/st/stm3210e_eval/support/mcuboot.conf`](boards/st/stm3210e_eval/support/mcuboot.conf) | MCUboot Kconfig |
+
+Hardware connection, bring-up, and board notes:
+[`docs/boards/stm3210e_eval.md`](docs/boards/stm3210e_eval.md).
+Keys: [`keys/README.md`](keys/README.md).
 
 ## Repository layout
 
@@ -82,12 +89,14 @@ and a compatible SDK automatically. No manual Zephyr install is required.
 zplatform/
 ├── config/toolchain.yml       # environment lock (authoritative)
 ├── boards/st/stm3210e_eval/   # OOT board support
-├── demo/zplatform_demo/       # full platform demo
-├── samples/                   # board-agnostic samples
+├── demo/<board>/              # per-board full showcase
+├── samples/                   # shared samples (DT / Kconfig gated)
 ├── lib/                       # platform services
-├── include/zplatform/         # public headers
+├── include/zplatform/         # public headers (incl. brand.h)
 ├── tests/                     # Ztest / Twister
-├── scripts/                   # sh/ + ps1/ + cmd/ + env/
+├── scripts/                   # sh/ + ps1/ + cmd/ + env/  → scripts/README.md
+├── docs/brand/                # logo, colors, slogans, banners
+├── build/<board>/...          # isolated demo|sample|boot / <config> outputs
 ├── docs/                      # architecture & board docs
 ├── keys/                      # signing key docs (no private keys)
 ├── west.yml                   # west manifest (revision synced from toolchain.yml)
@@ -96,6 +105,8 @@ zplatform/
 
 ## Documentation
 
+- [Brand](docs/brand/README.md) — logo, colors, slogans, asset catalog
+- [Scripts](scripts/README.md) — setup, build, clean, flash, debug, demo, MCUboot, test
 - [Environment manager](docs/environment.md)
 - [Architecture](docs/architecture/platform.md)
 - [STM3210E-EVAL](docs/boards/stm3210e_eval.md)

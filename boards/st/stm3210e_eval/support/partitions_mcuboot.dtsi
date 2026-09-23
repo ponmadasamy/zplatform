@@ -1,0 +1,53 @@
+/*
+ * Copyright (c) 2026 ZPlatform contributors
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * MCUboot flash map for STM32F103ZGT6 (1024 KiB, dual-bank, 2 KiB erase).
+ * Included by app + bootloader overlays; replaces the single "code" partition
+ * from the base board DTS.
+ *
+ * Dual-bank rule: MCUboot runs from bank1 and must program the *other* bank.
+ * Primary (slot0) therefore lives in bank2; secondary (slot1) shares bank1
+ * with the bootloader (upload target only — never erased while executing).
+ */
+
+&flash0 {
+	/delete-node/ partitions;
+
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		/*
+		 * | Region   | Offset   | Size   | Bank | Purpose              |
+		 * |-----------|----------|--------|------|----------------------|
+		 * | MCUboot   | 0x00000  | 64 KiB | 1    | Bootloader            |
+		 * | Slot 1    | 0x10000  | 448 KiB| 1    | Secondary (upgrade)   |
+		 * | Slot 0    | 0x80000  | 448 KiB| 2    | Primary (runs here)   |
+		 * | Storage   | 0xF0000  | 64 KiB | 2    | Settings / NVS        |
+		 *
+		 * BOOT_UPGRADE_ONLY: copy slot1 → slot0 (bank1 read / bank2 write)
+		 * while executing MCUboot from bank1 — safe on F103 XL dual-bank.
+		 */
+		boot_partition: partition@0 {
+			label = "mcuboot";
+			reg = <0x00000000 DT_SIZE_K(64)>;
+		};
+
+		slot1_partition: partition@10000 {
+			label = "image-1";
+			reg = <0x00010000 DT_SIZE_K(448)>;
+		};
+
+		slot0_partition: partition@80000 {
+			label = "image-0";
+			reg = <0x00080000 DT_SIZE_K(448)>;
+		};
+
+		storage_partition: partition@f0000 {
+			label = "storage";
+			reg = <0x000f0000 DT_SIZE_K(64)>;
+		};
+	};
+};

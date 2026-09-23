@@ -40,4 +40,63 @@ config ZPLATFORM_PROFILING
 	  Enable optional profiling instrumentation (cycle counters,
 	  timing helpers). Keep disabled for normal builds.
 
+config ZPLATFORM_LED_TRIGGERS
+	bool "ZPlatform Linux-style LED triggers"
+	depends on ZPLATFORM && GPIO
+	select THREAD_RUNTIME_STATS
+	select SCHED_THREAD_USAGE
+	select SCHED_THREAD_USAGE_ALL
+	default n
+	help
+	  Software LED triggers (heartbeat, cpu, timer, panic) for gpio-leds.
+	  Default mapping: led0=heartbeat, led1=cpu, led2=timer, led3=panic.
+	  Also installs a fatal-error handler that latches the panic LED.
+
+if ZPLATFORM_LED_TRIGGERS
+
+config ZPLATFORM_LED_TRIG_TIMER_ON_MS
+	int "Timer trigger LED on time (ms)"
+	default 500
+	range 20 5000
+
+config ZPLATFORM_LED_TRIG_TIMER_OFF_MS
+	int "Timer trigger LED off time (ms)"
+	default 500
+	range 20 5000
+
+endif # ZPLATFORM_LED_TRIGGERS
+
+config ZPLATFORM_MB895_LCD
+	bool "MB895 TFT LCD (STM3210E-EVAL FSMC bank4)"
+	depends on ZPLATFORM && SOC_SERIES_STM32F1X && DT_HAS_ZPLATFORM_MB895_LCD_ENABLED
+	default y
+	select DISPLAY
+	select USE_STM32_HAL_SRAM
+	select USE_STM32_LL_FSMC
+	select USE_STM32_HAL_GPIO
+	help
+	  Zephyr display driver for the MB895 TFT on CN16 (HX8347D /
+	  SPFD5408 / ILI9320) over FSMC bank4.
+
+config ZPLATFORM_FSMC_SRAM
+	bool "FSMC external SRAM (STM3210E-EVAL bank3)"
+	depends on ZPLATFORM && SOC_SERIES_STM32F1X
+	default y if BOARD_STM3210E_EVAL
+	select USE_STM32_HAL_SRAM
+	select USE_STM32_LL_FSMC
+	select USE_STM32_HAL_GPIO
+	help
+	  IS61WV51216BLL 512K×16 on FSMC NOR/PSRAM3 @ 0x68000000.
+
+config ZPLATFORM_SDIO_SD
+	bool "SDIO microSD (STM3210E-EVAL CN13)"
+	depends on ZPLATFORM && SOC_SERIES_STM32F1X
+	default n
+	select USE_STM32_HAL_SD
+	select USE_STM32_LL_SDMMC
+	select USE_STM32_HAL_GPIO
+	help
+	  microSD via SDIO (PC8-12, PD2, detect PF11). JP17 fitted, JP20
+	  open (SWD), JP22 open for 4-bit (else 1-bit). Polling HAL_SD.
+
 endmenu

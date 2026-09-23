@@ -35,6 +35,17 @@ goto usage
 call "%ZP_CMD%common.cmd" setup_env
 if errorlevel 1 exit /b 1
 
+rem Twister fails across Windows drives (repo vs west workspace).
+for %%I in ("%ZPLATFORM_ROOT%") do set "ZP_REPO_DRV=%%~dI"
+for %%I in ("%ZPLATFORM_WEST_WORKSPACE%") do set "ZP_WS_DRV=%%~dI"
+if /i not "%ZP_REPO_DRV%"=="%ZP_WS_DRV%" (
+  echo ERROR: twister cannot load tests across Windows drives. 1>&2
+  echo   repo      : %ZPLATFORM_ROOT% 1>&2
+  echo   workspace : %ZPLATFORM_WEST_WORKSPACE% 1>&2
+  echo Put zplatform on the same drive as the west workspace. 1>&2
+  exit /b 1
+)
+
 set "TEST_ROOT=%ZPLATFORM_ROOT%\tests"
 if defined FOCUS set "TEST_ROOT=%TEST_ROOT%\%FOCUS%"
 if not exist "%TEST_ROOT%" (

@@ -42,13 +42,17 @@ goto usage
 call "%ZP_CMD%common.cmd" setup_env
 if errorlevel 1 exit /b 1
 
-call "%ZP_CMD%common.cmd" resolve_app "%KIND%" "%NAME%"
+call "%ZP_CMD%common.cmd" resolve_app "%KIND%" "%NAME%" "%BOARD%"
 if errorlevel 1 exit /b 1
 
-call "%ZP_CMD%common.cmd" build_dir "%BOARD%" "%APP_NAME%" "profile"
+call "%ZP_CMD%common.cmd" build_dir "%BOARD%" "%APP_KIND%" "%APP_NAME%" "profile"
 if not exist "%BUILD_DIR%" mkdir "%BUILD_DIR%"
 
-set "CMAKE_ARGS=-b %BOARD% -d %BUILD_DIR% %APP_PATH% -- -DBOARD_ROOT=%ZPLATFORM_ROOT% -DZEPHYR_EXTRA_MODULES=%ZPLATFORM_ROOT% -DCONFIG_ZPLATFORM_PROFILING=y -DCONFIG_THREAD_RUNTIME_STATS=y -DCONFIG_INIT_STACKS=y -DCONFIG_THREAD_STACK_INFO=y -DCONFIG_THREAD_MONITOR=y"
+set "ROOT_FWD=%ZPLATFORM_ROOT:\=/%"
+set "BUILD_FWD=%BUILD_DIR:\=/%"
+set "APP_FWD=%APP_PATH:\=/%"
+
+set "CMAKE_ARGS=-b %BOARD% -d %BUILD_FWD% %APP_FWD% -- -DBOARD_ROOT=%ROOT_FWD% -DZEPHYR_EXTRA_MODULES=%ROOT_FWD% -DCONFIG_ZPLATFORM_PROFILING=y -DCONFIG_THREAD_RUNTIME_STATS=y -DCONFIG_INIT_STACKS=y -DCONFIG_THREAD_STACK_INFO=y -DCONFIG_THREAD_MONITOR=y"
 
 set "WEST_CMDLINE=build !CMAKE_ARGS!"
 call "%ZP_CMD%common.cmd" west

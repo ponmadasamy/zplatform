@@ -2,7 +2,7 @@
 # Copyright (c) 2026 ZPlatform contributors
 # SPDX-License-Identifier: Apache-2.0
 #
-# Flash the last built (or explicitly selected) application via west runners.
+# Flash an existing build. Never rebuilds.
 
 set -euo pipefail
 
@@ -13,15 +13,17 @@ source "${SCRIPT_DIR}/common.sh"
 usage() {
 	cat <<EOF
 Usage:
-  $0 [demo|sample <name>] [--board BOARD] [--erase] [--runner NAME]
+  $0 [demo|sample <name>] [--board BOARD] [--config CFG] [--erase] [--runner NAME]
 
-Default: flash the last successful build recorded in build/.zplatform-last-build
+  No app args: flash the last successful build (build/.zplatform-last-build).
+  Flash never rebuilds — it only selects an existing build/<board>/... tree.
 EOF
 }
 
 KIND=""
 NAME=""
 BOARD=""
+CONFIG=""
 ERASE=0
 RUNNER=""
 
@@ -29,15 +31,24 @@ while [[ $# -gt 0 ]]; do
 	case "$1" in
 	demo)
 		KIND="demo"
+		NAME="demo"
 		shift
 		;;
 	sample)
 		KIND="sample"
 		NAME="${2:-}"
+		if [[ -z "${NAME}" || "${NAME}" == --* ]]; then
+			echo "error: sample name required" >&2
+			exit 1
+		fi
 		shift 2
 		;;
 	--board)
 		BOARD="$2"
+		shift 2
+		;;
+	--config)
+		CONFIG="$2"
 		shift 2
 		;;
 	--erase)
@@ -61,51 +72,37 @@ while [[ $# -gt 0 ]]; do
 done
 
 zplatform_setup_env
-# Flash/debug tools are required only for flash — not for build.
 ROOT_PY="$(zplatform_venv_python)"
 ROOT="$(zplatform_root)"
-"${ROOT_PY}" "${ROOT}/scripts/env/zplatform_env.py" --ensure --require-flash-tools >/dev/null
+"${ROOT_PY}" "${ROOT}/scripts/env/zplatform_env.py" --require-flash-tools >/dev/null
 
+CFG=""
 if [[ -n "${KIND}" ]]; then
-	zplatform_resolve_app "${KIND}" "${NAME}"
 	BOARD="${BOARD:-${ZPLATFORM_DEFAULT_BOARD}}"
-	BUILD_DIR="$(zplatform_build_dir "${BOARD}" "${APP_NAME}" default)"
-	if [[ ! -d "${BUILD_DIR}" ]]; then
-		# try mcuboot/debug/release
-		for cfg in mcuboot debug release default; do
-			cand="$(zplatform_build_dir "${BOARD}" "${APP_NAME}" "${cfg}")"
-			if [[ -d "${cand}/zephyr" ]]; then
-				BUILD_DIR="${cand}"
-				break
-			fi
-		done
-	fi
+	zplatform_resolve_app "${KIND}" "${NAME}" "${BOARD}"
+	zplatform_resolve_build_dir "${BOARD}" "${APP_KIND}" "${APP_NAME}" "${CONFIG}"
+	APP_DISP="${APP_NAME}"
 else
 	zplatform_read_last_build
-	BOARD="${board}"
-	BUILD_DIR="${build_dir}"
-	APP_NAME="${application}"
-fi
-
-if [[ ! -d "${BUILD_DIR}" ]]; then
-	echo "error: build directory not found: ${BUILD_DIR}" >&2
-	exit 1
-fi
-
-echo "Flashing board=${BOARD} app=${APP_NAME} dir=${BUILD_DIR}"
-
-# Best-effort ST-Link detection (does not fail the flash if missing).
-if command -v lsusb >/dev/null 2>&1; then
-	if lsusb 2>/dev/null | grep -qi "STMicroelectronics\|ST-LINK\|STM32"; then
-		echo "ST-Link: detected via lsusb"
+	BOARD="${BOARD:-${board}}"
+	if [[ -n "${CONFIG}" && "${CONFIG}" != "${configuration}" ]]; then
+		zplatform_resolve_build_dir "${BOARD}" "${kind}" "${application}" "${CONFIG}"
+		APP_DISP="${application}"
 	else
-		echo "ST-Link: not detected via lsusb (continuing; runner may still work)"
+		BUILD_DIR="${build_dir}"
+		CFG="${configuration}"
+		APP_DISP="${application}"
+		if [[ ! -d "${BUILD_DIR}/zephyr" ]]; then
+			echo "error: last build missing at ${BUILD_DIR}" >&2
+			exit 1
+		fi
 	fi
 fi
+
+echo "Flashing board=${BOARD} app=${APP_DISP} config=${CFG} dir=${BUILD_DIR}"
 
 FLASH_ARGS=(-d "${BUILD_DIR}")
 if [[ "${ERASE}" -eq 1 ]]; then
-	echo "Full chip erase requested"
 	FLASH_ARGS+=(--erase)
 fi
 if [[ -n "${RUNNER}" ]]; then
@@ -114,5 +111,4 @@ fi
 
 echo "Executing: west flash ${FLASH_ARGS[*]}"
 zplatform_west flash "${FLASH_ARGS[@]}"
-
-echo "Flash complete. Target should reset via the selected runner."
+echo "Flash complete."
