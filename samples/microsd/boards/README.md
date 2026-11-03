@@ -4,7 +4,7 @@
 
 | Item | Value |
 |------|-------|
-| Interface | SDIO (1-bit always works; 4-bit if JP22 open) |
+| Interface | SDIO (this driver uses 1-bit; the board wiring also exposes D1–D3) |
 | D0–D3 / CLK | PC8–PC11 / PC12 |
 | CMD | PD2 |
 | Detect | PF11 (active low) |
@@ -17,5 +17,6 @@
 | **JP20** | **Open** | Fitted disables JTAG/SWD; leave open |
 | **JP22** | **Open** | Open → PC11 = SD D3; fitted → IrDA RX |
 
-Driver uses **1-bit** SDIO for bring-up (reliable if JP22 is fitted for IrDA).
-Insert a card in CN13 before flashing.
+The current HAL driver initializes SDIO in **1-bit mode**; it does not switch
+to 4-bit mode, so JP22 is not required for this sample's bus width. Keep JP17
+fitted and JP20 open as above. Insert a card in CN13 before running the sample.

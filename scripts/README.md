@@ -94,7 +94,10 @@ Existing SDK installs are never uninstalled.
 
 ## build
 
-Kinds: `demo` | `sample <name>` (`board_bringup` | `gpio` | `sensor`).
+Kinds: `demo` | `sample <name>`. The current sample directories are
+`board_bringup`, `gpio`, `sensor`, `spi_flash`, `adc`, `pwm`, `lcd`,
+`ext_sram`, `microsd`, `lvgl`, `rtc`, `dac`, `can`, and `usb_cdc`.
+The build scripts resolve sample names from `samples/<name>/`.
 
 | Flag | Config | Behavior |
 |------|--------|----------|

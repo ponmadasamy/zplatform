@@ -109,7 +109,7 @@ ship STM32F103**ZE**T6 (512 KiB / 64 KiB). Package TQFP-144.
 
 | Feature | Part / interface | Description | Zephyr support |
 |---------|------------------|-------------|----------------|
-| TFT colour LCD | **MB895** on **CN16**, 320×240 (Cube landscape / HX8347D MAC 0xE0), FSMC bank1 NOR/PSRAM4 | Controller is one of ST BSP set: **HX8347D**, **ILI9320**, or **SPFD5408** (runtime ID) | OOT `zplatform,mb895-lcd` Zephyr `display` driver |
+| TFT colour LCD | **MB895** on **CN16**, 320×240 (Cube landscape / HX8347D MAC 0xE0), FSMC bank1 NOR/PSRAM4 | ST BSP variants include **HX8347D**, **ILI9320**, or **SPFD5408** (runtime ID); the driver also handles **ILI9325** | OOT `zplatform,mb895-lcd` Zephyr `display` driver |
 | Optional graphic LCD | **U18** footprint **HXM122032-GB1** 122×32 (default **not fitted**) | Second LCD option | N/A unless populated |
 | Audio DAC + jack | **AK4343** on I2S (+ MCU DAC); PDN **PG11**; **CN15** 3.5 mm; JP15/JP18 | Stereo audio out | `i2s_stm32` data path; no in-tree `ak4343` codec (ST BSP `stm32-ak4343`) |
 
@@ -129,9 +129,12 @@ function is live. Sample DT must document the jumper set it assumes.
 
 ## Samples preparation checklist
 
-Track enablement against the inventory above. **Done** = in DTS and exercised
-by a sample and/or `demo/stm3210e_eval`. **Partial** = DT (or bus) only, or
-smoke/ready-check only. **Todo** = on the EVK, not in DTS / no sample yet.
+Track implementation against the inventory above. **Done** = the feature is
+described in the board DTS and used by a sample and/or `demo/stm3210e_eval`;
+this status alone does not claim that every sample was run on hardware.
+**Partial** = DT (or bus) only, or smoke/ready-check only. **Todo** = on the
+EVK, not in DTS / no sample yet. Dated physical test results are listed
+separately under [Hardware validation](#hardware-validation).
 
 | # | Feature | DT | Sample / demo | Status |
 |---|---------|----|---------------|--------|
@@ -143,14 +146,14 @@ smoke/ready-check only. **Todo** = on the EVK, not in DTS / no sample yet.
 | 6 | Wakeup (B2) | `sw-wakeup` | `samples/gpio` WKUP → reset/boot | **Done** |
 | 7 | Joystick (U19) | joy-* aliases | `samples/gpio` timer + rotate | **Done** |
 | 8 | STLM75M2F temp | `stlm75` / `lm75` | `sensor`, demo | **Done** |
-| 9 | Die temperature | `die_temp` | demo live + sensor | **Done** |
+| 9 | Die temperature | `die_temp` | demo live | **Done** |
 | 10 | SPI1 bus | `spi1` + CS PB2 | demo bus-ready | **Done** |
 | 11 | SPI NOR M25P64 | `m25p64` / `jedec,spi-nor` | `samples/spi_flash`, demo JEDEC | **Done** |
 | 12 | ADC1 | `adc1` + IN11–14 | `samples/adc` (RV1), BNC DT | **Done** |
 | 13 | RV1 potentiometer (PC4) | `adc1_in14_pc4` / `zephyr,user` | `samples/adc`, demo | **Done** |
 | 14 | BNC analog (PC1–PC3) | ADC IN11–13 in DT | DT ready (probe via adc) | **Partial** |
 | 15 | PWM TIM1_CH1 (PA8) | `pwm1` + `pwm-led0` | `samples/pwm`, demo set | **Done** |
-| 16 | RTC (+ CR1220) | `rtc` (F1 = counter) | `samples/rtc`, demo ticks | **Done** |
+| 16 | RTC (+ CR1220) | `rtc` (F1 counter; DTS selects LSI) | Tick reads; battery-backed retention is not verified | **Done** |
 | 17 | IWDG | `iwdg` | DT / alias | **Partial** |
 | 18 | USB FS (CN14) | `usb` okay | `samples/usb_cdc` (CAN off) | **Done** |
 | 19 | USART2 (CN8) | node disabled | — | **Todo** (JP4 mux) |
@@ -181,13 +184,13 @@ smoke/ready-check only. **Todo** = on the EVK, not in DTS / no sample yet.
 | `samples/ext_sram` | FSMC bank3 IS61WV51216 selftest | **Done** |
 | `samples/microsd` | SDIO CN13 detect + R/W | **Done** |
 | `samples/lvgl` | Brand splash on MB895 (VDB in EXT_SRAM) | **Done** |
-| `samples/rtc` | RTC set/get (LSI / X2) | **Done** |
+| `samples/rtc` | RTC counter start and tick reads (DTS-selected LSI) | **Done** |
 | `samples/dac` | DAC1 CH1 PA4 sawtooth | **Done** |
 | `samples/can` | bxCAN loopback (USB off — IRQ share) | **Done** |
 | `samples/usb_cdc` | USB FS CDC ACM on CN14 | **Done** |
 | `demo/stm3210e_eval` | Console smoke + LVGL UI (live peri/threads) | **Done** |
 | `tests/platform/smoke` | Ztest smoke | **Done** (on-device) |
-| `tests/drivers/display` | MB895 `display` API (write/blanking/ID) | **Done** (on-device) |
+| `tests/drivers/display` | MB895 `display` API (write/blanking/ID) | **Implemented**; no dated run is recorded below |
 
 ### Suggested next (planning)
 
@@ -430,13 +433,19 @@ Twister default mode is **build-only** for this board.
 - Older MB672 boards with ZET6 (DEV_ID `0x414`, 512 KiB) need a DT/memory variant — this lab board is ZGT6.
 - NOR Flash U2 and NAND density/controller marking can vary by build; identify the part on the PCB before writing flash samples.
 - Many connectors share pins — see **Multiplexing note** in the EVK inventory.
-- MCUboot **slot1 upgrade** (`mcuboot_demo -Upgrade`) is still unreliable on this
-  dual-bank F103 layout (programming/erase interaction). `mcuboot_demo -Flash`
-  (boot + signed v1 in slot0 @ bank2) is verified; treat `-Upgrade` as WIP.
+- The current MCUboot configuration selects `CONFIG_BOOT_UPGRADE_ONLY`.
+  The dated swap-move upgrade result below is from a different configuration
+  and does not verify the current overwrite-only `mcuboot_demo -Upgrade` flow.
+  Treat the current upgrade flow as unverified until it is rerun on this
+  configuration.
 - Progress on DT/samples: **Samples preparation checklist**.
 - Hardware bring-up: STLINK-V3MINI (+ adapter) on **CN9**, board powered separately.
 
 ## Hardware validation
+
+The following is the recorded hardware-validation snapshot from 2026-09-19.
+The MCUboot swap-move result is historical and does not correspond to the
+current `CONFIG_BOOT_UPGRADE_ONLY` setting described above.
 
 ```text
 Hardware validation: PASS (2026-09-19)
@@ -450,8 +459,8 @@ board_bringup     : PASS (LED, BUTTON, Console)
 platform smoke    : PASS (3/3 ztest on-device)
 demo/stm3210e_eval : PASS (peripherals + shell `zplatform info`)
 MCUboot + signed  : PASS (v2.4.0 → slot0; ECDSA-P256; confirm in demo)
-MCUboot upgrade   : PASS swap-move (slot1→slot0); pad+bank-aligned slots
-                  : verified slot0 image header iv_major=2 after upgrade
+MCUboot upgrade   : Historical PASS with swap-move (slot1→slot0)
+                  : Not a result for the current overwrite-only configuration
 ```
 
 Correct VCP wiring (confirmed on hardware):
@@ -463,4 +472,3 @@ Correct VCP wiring (confirmed on hardware):
 | GND | pin 1/10 | GND |
 
 (Labels are target-side: MCU TX → pin 14, MCU RX ← pin 13.)
-

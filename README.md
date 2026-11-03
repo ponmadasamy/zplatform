@@ -92,12 +92,13 @@ zplatform/
 ├── demo/<board>/              # per-board full showcase
 ├── samples/                   # shared samples (DT / Kconfig gated)
 ├── lib/                       # platform services
+├── drivers/                   # out-of-tree Zephyr drivers
+├── dts/bindings/              # ZPlatform DeviceTree bindings
 ├── include/zplatform/         # public headers (incl. brand.h)
 ├── tests/                     # Ztest / Twister
 ├── scripts/                   # sh/ + ps1/ + cmd/ + env/  → scripts/README.md
-├── docs/brand/                # logo, colors, slogans, banners
+├── docs/                      # architecture, board, environment, test, debug, brand
 ├── build/<board>/...          # isolated demo|sample|boot / <config> outputs
-├── docs/                      # architecture & board docs
 ├── keys/                      # signing key docs (no private keys)
 ├── west.yml                   # west manifest (revision synced from toolchain.yml)
 └── zephyr/module.yml          # Zephyr module metadata
